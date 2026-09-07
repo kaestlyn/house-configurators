@@ -1,0 +1,665 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Garage Elevation Tool</title>
+<style>
+  :root {
+    --paper:#F4F2EE; --sunk:#EAE6E0; --ink:#26201D; --muted:#766C66;
+    --line:#DCD6CD; --accent:#9E4A38; --ok:#3F6B47; --warn:#8A6A21;
+    --sky:#CBD8DF; --grass:#8C9A72; --drive:#C6C2BB;
+    --mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper:#191614; --sunk:#14110F; --ink:#EDE7E1; --muted:#A0968E;
+      --line:#37312C; --accent:#D5826A; --ok:#7FB08A; --warn:#C9A44E;
+      --sky:#2B3941; --grass:#454F3B; --drive:#3A3733;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family:var(--sans); font-size:15px; line-height:1.55;
+  }
+  .wrap { max-width:1180px; margin:0 auto; padding:32px 24px 80px; }
+  h1 { font-size:26px; margin:0 0 6px; font-weight:600; letter-spacing:-0.01em; }
+  .sub { color:var(--muted); margin:0 0 28px; max-width:62ch; }
+  code { font-family:var(--mono); font-size:0.92em; background:var(--sunk); padding:1px 5px; border-radius:3px; }
+
+  /* ---- controls ---- */
+  .panel {
+    background:var(--sunk); border:1px solid var(--line);
+    padding:20px 22px; margin-bottom:14px;
+  }
+  .panel h2 {
+    font-family:var(--mono); font-size:11px; font-weight:500; letter-spacing:0.14em;
+    text-transform:uppercase; color:var(--accent); margin:0 0 14px;
+  }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px 18px; }
+  label { display:flex; flex-direction:column; gap:4px; font-size:12.5px; color:var(--muted); }
+  label span { font-family:var(--mono); letter-spacing:0.04em; text-transform:uppercase; font-size:10.5px; }
+  input[type=number], select {
+    font-family:var(--mono); font-size:14px; padding:6px 8px;
+    background:var(--paper); color:var(--ink);
+    border:1px solid var(--line); border-radius:3px; width:100%;
+  }
+  label.check { flex-direction:row; align-items:center; gap:8px; font-size:13px; }
+  input[type=checkbox] { width:16px; height:16px; accent-color:var(--accent); }
+
+  .swatches { display:grid; grid-template-columns:repeat(auto-fit,minmax(110px,1fr)); gap:12px 18px; margin-top:16px; }
+  .swatch { display:flex; flex-direction:column; gap:4px; font-size:12.5px; color:var(--muted); }
+  .swatch span { font-family:var(--mono); letter-spacing:0.04em; text-transform:uppercase; font-size:10.5px; }
+  input[type=color] {
+    width:100%; height:30px; padding:2px; background:var(--paper);
+    border:1px solid var(--line); border-radius:3px; cursor:pointer;
+  }
+
+  /* ---- checks readout ---- */
+  .checks { display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:10px 20px; }
+  .chk { font-family:var(--mono); font-size:12.5px; line-height:1.5; display:flex; gap:8px; align-items:baseline; }
+  .chk .dot { width:8px; height:8px; border-radius:50%; flex:none; margin-top:5px; }
+  .chk.ok .dot { background:var(--ok); }
+  .chk.warn .dot { background:var(--warn); }
+  .chk b { font-weight:600; }
+  .chk .lbl { color:var(--muted); }
+
+  /* ---- output ---- */
+  .scheme { margin-top:34px; }
+  .shead { display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; margin-bottom:8px; }
+  .shead h3 { margin:0; font-size:18px; font-weight:600; }
+  .shead .mat { font-family:var(--mono); font-size:11.5px; color:var(--muted); letter-spacing:0.04em; }
+  .shead button {
+    margin-left:auto; font-family:var(--mono); font-size:11px; letter-spacing:0.08em;
+    text-transform:uppercase; padding:5px 11px; cursor:pointer;
+    background:var(--paper); color:var(--ink); border:1px solid var(--line); border-radius:3px;
+  }
+  .shead button:hover { border-color:var(--accent); color:var(--accent); }
+  .art { background:var(--sunk); border:1px solid var(--line); line-height:0; overflow:hidden; }
+  .art svg { display:block; width:100%; height:auto; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Garage elevation tool</h1>
+  <!-- Everything is driven by the CONFIG object at the top of the script.
+       The drawing is generated SVG; "Save SVG" hands you a file you can
+       open in Figma or Inkscape. -->
+
+  <div class="panel">
+    <h2>Building</h2>
+    <div class="grid" id="ctlBuilding"></div>
+  </div>
+
+  <div class="panel">
+    <h2>Doors &amp; dormers</h2>
+    <div class="grid" id="ctlDoors"></div>
+  </div>
+
+  <div class="panel">
+    <h2>Appearance</h2>
+    <div class="grid" id="ctlAppearance"></div>
+    <div class="swatches" id="ctlColors"></div>
+  </div>
+
+  <div class="panel">
+    <h2>Checks</h2>
+    <div class="checks" id="checks"></div>
+  </div>
+
+  <div id="out"></div>
+</div>
+
+<script>
+"use strict";
+
+/* ===================================================================
+   CONFIG — everything the drawing is built from. All dimensions in feet
+   unless the name says inches. Change these and the drawing follows.
+   =================================================================== */
+
+const CONFIG = {
+  widthFt:        33,     // the door wall
+  depthFt:        24,     // front to back; sets ridge height with pitch
+  wallHeightFt:   11,     // slab to plate (also the loft floor level)
+  pitch:          10,     // rise per 12 of run
+
+  doorWidths:   [18, 9],  // left to right
+  doorHeightFt:   8,
+  cornerReturnFt: 2,      // wall at each end of the elevation
+  pierFt:         2,      // wall between doors
+
+  curbInches:     8,      // one course of block
+  overhangInches: 16,     // eave and rake overhang
+
+  showDormers:    true,
+  dormerWidths: [10, 5],  // one per door; set showDormers false to omit
+  dormerWallFt:   3.5,    // face wall height below the dormer gable
+
+  showStairs:     true,
+  stairWidthFt:   4,
+  riserInches:    7,
+  treadInches:    11,
+
+  showHouse:      true,
+  houseGapFt:     13,     // garage wall to house wall
+
+  pxPerFt:        16,     // drawing scale
+
+  // appearance — siding type and colors are independent of each other
+  siding:         "bb",   // "bb" (board & batten) or "lap"
+  colors: { body:"#F0ECE3", batten:"#F5F1E9", trim:"#F0ECE3", door:"#2B2926", glass:"#8FA3AD", roof:"#2B2926", curb:"#5E5852" }
+};
+
+/* Siding types the wall pattern can be drawn in. */
+
+const SIDING_TYPES = [
+  { id: "bb",  name: "Board & batten" },
+  { id: "lap", name: "8\" lap" }
+];
+
+/* Pre-configured color palettes. Any of these can be loaded, then tweaked
+   freely — the palette and the siding type are chosen independently. */
+
+const PALETTES = [
+  { name: "White",       c: { body:"#F0ECE3", batten:"#F5F1E9", trim:"#F0ECE3", door:"#2B2926", glass:"#8FA3AD", roof:"#2B2926", curb:"#5E5852" } },
+  { name: "Charcoal",    c: { body:"#3B3A37", batten:"#3B3A37", trim:"#F0ECE3", door:"#31302D", glass:"#7E939E", roof:"#2B2926", curb:"#26251F" } },
+  { name: "Warm greige", c: { body:"#A99C8B", batten:"#A99C8B", trim:"#F0ECE3", door:"#2B2926", glass:"#8FA3AD", roof:"#2B2926", curb:"#6B6255" } },
+  { name: "Deep green",  c: { body:"#3D4A3F", batten:"#42503F", trim:"#F0ECE3", door:"#2B2926", glass:"#8FA3AD", roof:"#2B2926", curb:"#2C332B" } }
+];
+
+const COLOR_ROLES = [
+  ["body",   "Siding body"],
+  ["batten", "Batten / lap accent"],
+  ["trim",   "Trim"],
+  ["door",   "Doors"],
+  ["glass",  "Glass"],
+  ["roof",   "Roof"],
+  ["curb",   "Curb"]
+];
+
+/* ===================================================================
+   Geometry — derived from CONFIG. Everything downstream reads this.
+   =================================================================== */
+
+function geometry(cfg) {
+  const S = cfg.pxPerFt;
+  const ft = f => f * S;
+  const inch = i => (i / 12) * S;
+
+  const wallW = ft(cfg.widthFt);
+  const wallH = ft(cfg.wallHeightFt);
+  const ridgeRise = ft(cfg.depthFt / 2) * (cfg.pitch / 12);
+  const fascia = ft(0.9);
+  const OH = inch(cfg.overhangInches);
+  const curb = inch(cfg.curbInches);
+
+  const TOP = 34;                       // headroom above the ridge cap
+  const ridgeY = TOP;
+  const eaveY = ridgeY + ridgeRise;
+  const wallTopY = eaveY + fascia;
+  const groundY = wallTopY + wallH;
+  const H = groundY + 74;
+
+  const x0 = 46;
+  const x1 = x0 + wallW;
+
+  // door openings, laid out left to right from the corner return
+  const doors = [];
+  let cur = x0 + ft(cfg.cornerReturnFt);
+  cfg.doorWidths.forEach((w, i) => {
+    doors.push([cur, cur + ft(w)]);
+    cur += ft(w) + (i < cfg.doorWidths.length - 1 ? ft(cfg.pierFt) : 0);
+  });
+
+  const stairW = ft(cfg.stairWidthFt);
+  const stairCx = x1 + ft(0.5) + stairW / 2;
+  const houseX = x1 + ft(cfg.houseGapFt);
+  const W = cfg.showHouse ? houseX + 96 : Math.max(x1 + ft(2), stairCx + stairW) + 40;
+
+  return { S, ft, inch, x0, x1, wallW, wallH, ridgeRise, fascia, OH, curb,
+           ridgeY, eaveY, wallTopY, groundY, doors, stairCx, stairW, houseX, W, H };
+}
+
+/* ===================================================================
+   Drawing helpers
+   =================================================================== */
+
+const esc = s => String(s);
+const rect = (x, y, w, h, f) =>
+  `<rect x="${esc(x)}" y="${esc(y)}" width="${esc(w)}" height="${esc(h)}" fill="${f}"/>`;
+const poly = (pts, f) => `<polygon points="${pts}" fill="${f}"/>`;
+
+function sidingPattern(id, kind, g) {
+  if (kind === "bb") {
+    const p = g.ft(1.35), b = g.ft(0.3);
+    return `<pattern id="${id}" width="${p}" height="600" patternUnits="userSpaceOnUse">
+      <rect width="${p}" height="600" fill="var(--body)"/>
+      <rect width="${b}" height="600" fill="var(--batten)"/>
+      <rect x="${b}" width="1.3" height="600" fill="rgba(0,0,0,0.13)"/></pattern>`;
+  }
+  const h = g.ft(0.67);
+  return `<pattern id="${id}" width="600" height="${h}" patternUnits="userSpaceOnUse">
+    <rect width="600" height="${h}" fill="var(--body)"/>
+    <rect y="${h - 1.3}" width="600" height="1.3" fill="rgba(0,0,0,0.15)"/></pattern>`;
+}
+
+function brickPattern(id) {
+  return `<pattern id="${id}" width="40" height="13" patternUnits="userSpaceOnUse">
+    <rect width="40" height="13" fill="#A5503C"/>
+    <rect width="40" height="1.8" y="11.2" fill="#8B4231"/>
+    <rect width="1.8" height="13" fill="#8B4231"/>
+    <rect width="1.8" height="13" x="20" fill="#9A4A37"/></pattern>`;
+}
+
+/* one overhead door with a glazed top section */
+function overheadDoor(a, b, g, cfg) {
+  const top = g.groundY - g.ft(cfg.doorHeightFt);
+  const w = b - a, secH = (g.groundY - top) / 4;
+  let s = rect(a, top, w, g.groundY - top, "var(--door)");
+
+  const lites = Math.max(2, Math.round(w / g.ft(3.2)));
+  const pad = 8, iw = (w - pad * 2) / lites;
+  for (let i = 0; i < lites; i++) {
+    s += rect(a + pad + i * iw + 2.5, top + 5, iw - 5, secH - 10, "var(--glass)");
+    s += rect(a + pad + i * iw + 2.5, top + 5, iw - 5, 1.6, "rgba(255,255,255,0.28)");
+  }
+  for (let k = 1; k < 4; k++) s += rect(a, top + k * secH - 1, w, 1.8, "rgba(0,0,0,0.22)");
+  for (let m = 1; m < 4; m++) {
+    const py = top + m * secH;
+    s += rect(a + 7, py + 6, w - 14, 1.2, "rgba(0,0,0,0.10)");
+    s += rect(a + 7, py + secH - 8, w - 14, 1.2, "rgba(0,0,0,0.10)");
+  }
+  // casing
+  s += rect(a - 6, top - 6, w + 12, 6, "var(--trim)");
+  s += rect(a - 6, top - 6, 6, g.groundY - top + 6, "var(--trim)");
+  s += rect(b, top - 6, 6, g.groundY - top + 6, "var(--trim)");
+  return s;
+}
+
+/* gable dormer sitting on the front roof slope */
+function dormer(cx, widthFt, g, cfg, uid) {
+  const hw = g.ft(widthFt) / 2;
+  const base = g.eaveY - 6;
+  const wallH = g.ft(cfg.dormerWallFt);
+  const wallT = base - wallH;
+  const peak = wallT - g.ft(widthFt / 2) * (cfg.pitch / 12);
+
+  let s = poly(`${cx - hw - 7},${wallT + 5} ${cx},${peak} ${cx + hw + 7},${wallT + 5}`, "var(--roof)");
+  s += poly(`${cx - hw - 4},${wallT + 9} ${cx},${peak + 5} ${cx + hw + 4},${wallT + 9}`, "var(--trim)");
+  s += rect(cx - hw, wallT, hw * 2, base - wallT, `url(#sd${uid})`);
+  s += rect(cx - hw, wallT, 6, base - wallT, "var(--trim)");
+  s += rect(cx + hw - 6, wallT, 6, base - wallT, "var(--trim)");
+  s += rect(cx - hw, base - 4, hw * 2, 4, "var(--trim)");
+
+  const ww = Math.min(hw * 2 - 26, g.ft(widthFt > 7 ? 5.8 : 2.5));
+  const wh = wallH - 14;
+  s += rect(cx - ww / 2 - 4, wallT + 7, ww + 8, wh + 8, "var(--trim)");
+  s += rect(cx - ww / 2, wallT + 11, ww, wh, "var(--glass)");
+  s += rect(cx - ww / 2, wallT + 11, ww, 1.8, "rgba(255,255,255,0.26)");
+  const mull = widthFt > 7 ? 3 : 1;
+  for (let i = 1; i <= mull; i++) {
+    s += rect(cx - ww / 2 + (ww / (mull + 1)) * i - 1, wallT + 11, 2, wh, "var(--trim)");
+  }
+  s += rect(cx - hw - 7, base, hw * 2 + 14, 3.5, "rgba(0,0,0,0.16)");
+  return s;
+}
+
+/* exterior stair running front-to-back along the gable wall, drawn straight
+   on (no perspective taper) so it stays inline with the garage side wall. */
+function stairs(g, cfg) {
+  const rise = g.groundY - g.wallTopY;
+  const n = Math.max(2, Math.round(g.ft(cfg.wallHeightFt) / g.inch(cfg.riserInches)));
+  const stepH = rise / n;
+  const w = g.ft(cfg.stairWidthFt);
+  const cx = g.stairCx, RH = g.ft(2.6);
+
+  let s = rect(cx - w / 2 - 5, g.groundY - 3, w + 10, 5, "rgba(0,0,0,0.16)");
+
+  for (let i = 0; i < n; i++) {
+    const y = g.groundY - i * stepH;
+    s += rect(cx - w / 2, y - stepH, w, stepH, "var(--door)");
+    s += rect(cx - w / 2, y - stepH, w, 2.2, "rgba(255,255,255,0.15)");
+    s += rect(cx - w / 2, y - 2.2, w, 2.2, "rgba(0,0,0,0.30)");
+  }
+
+  [-1, 1].forEach(k => {
+    s += rect(cx + k * (w / 2) - (k > 0 ? 0 : 7), g.wallTopY, 7, g.groundY - g.wallTopY, "var(--trim)");
+    for (let p = 0; p <= n; p += 5) {
+      const px = cx + k * (w / 2 + 3.5), py = g.groundY - p * stepH;
+      s += rect(px - 1.7, py - RH, 3.4, RH, "var(--trim)");
+    }
+    s += rect(cx + k * (w / 2 + 1) - (k > 0 ? 0 : 6), g.wallTopY - RH, 6, g.groundY - g.wallTopY, "var(--trim)");
+  });
+
+  s += rect(cx - w / 2 - 6, g.wallTopY - 3, w + 12, 5, "var(--trim)");
+  return s;
+}
+
+/* ===================================================================
+   The elevation
+   =================================================================== */
+
+function drawGarage(cfg, uid) {
+  const g = geometry(cfg);
+  let s = "";
+
+  s += `<defs>${sidingPattern("sd" + uid, cfg.siding, g)}${brickPattern("bk" + uid)}</defs>`;
+
+  // ground and sky
+  s += rect(0, 0, g.W, g.groundY, "var(--sky)");
+  s += rect(0, g.groundY, g.W, g.H - g.groundY, "var(--grass)");
+  s += rect(14, g.groundY, g.x1 + g.ft(6), g.H - g.groundY, "var(--drive)");
+  s += rect(14, g.groundY, g.x1 + g.ft(6), 2, "rgba(0,0,0,0.12)");
+
+  // the house across the gap, for color reference
+  if (cfg.showHouse) {
+    s += rect(g.houseX, 62, g.W - g.houseX, g.groundY - 62, `url(#bk${uid})`);
+    s += rect(g.houseX, 62, 6, g.groundY - 62, "rgba(0,0,0,0.20)");
+    s += rect(g.houseX, 44, g.W - g.houseX, 20, "#F1EDE5");
+    s += rect(g.houseX, 34, g.W - g.houseX, 11, "#31302E");
+  }
+
+  // stairs are drawn before the roof/fascia so their top tucks behind the eave
+  if (cfg.showStairs) s += stairs(g, cfg);
+
+  // roof: ridge parallel to the door wall, front slope in view
+  const RL = g.x0 - g.OH, RR = g.x1 + g.OH;
+  s += rect(RL, g.ridgeY, RR - RL, g.eaveY - g.ridgeY, "var(--roof)");
+  for (let cy = g.ridgeY + 10; cy < g.eaveY - 2; cy += 10) {
+    s += rect(RL, cy, RR - RL, 1.3, "rgba(255,255,255,0.055)");
+    s += rect(RL, cy + 1.3, RR - RL, 0.9, "rgba(0,0,0,0.13)");
+  }
+  s += rect(RL, g.ridgeY - 6, RR - RL, 8, "var(--roof)");
+  s += rect(RL, g.ridgeY - 6, RR - RL, 1.8, "rgba(255,255,255,0.10)");
+
+  // dormers, one per door
+  if (cfg.showDormers) {
+    g.doors.forEach((d, i) => {
+      const w = cfg.dormerWidths[i];
+      if (w > 0) s += dormer((d[0] + d[1]) / 2, w, g, cfg, uid);
+    });
+  }
+
+  // wall
+  s += rect(g.x0, g.wallTopY, g.wallW, g.groundY - g.curb - g.wallTopY, `url(#sd${uid})`);
+
+  // block curb, interrupted by the openings
+  let curbX = g.x0;
+  g.doors.forEach(d => {
+    s += rect(curbX, g.groundY - g.curb, d[0] - curbX, g.curb, "var(--curb)");
+    curbX = d[1];
+  });
+  s += rect(curbX, g.groundY - g.curb, g.x1 - curbX, g.curb, "var(--curb)");
+
+  // doors
+  g.doors.forEach(d => { s += overheadDoor(d[0], d[1], g, cfg); });
+
+  // corner boards
+  s += rect(g.x0, g.wallTopY, 11, g.groundY - g.curb - g.wallTopY, "var(--trim)");
+  s += rect(g.x1 - 11, g.wallTopY, 11, g.groundY - g.curb - g.wallTopY, "var(--trim)");
+
+  // fascia, soffit, gutter
+  s += rect(RL, g.eaveY, RR - RL, g.fascia, "var(--trim)");
+  s += rect(RL, g.eaveY, RR - RL, 1.8, "rgba(0,0,0,0.22)");
+  s += rect(RL, g.wallTopY - 4, RR - RL, 4, "var(--trim)");
+  s += rect(g.x0 - 2, g.wallTopY, g.wallW + 4, 4, "rgba(0,0,0,0.15)");
+  s += rect(g.x0 - 8, g.wallTopY, 6, g.groundY - g.wallTopY, "var(--trim)");
+
+  // Site colors are pinned on the <svg> itself (not inherited from the page)
+  // so a saved .svg still renders correctly on its own.
+  const site = { sky: "#CBD8DF", grass: "#8C9A72", drive: "#C6C2BB" };
+  const vars = Object.entries({ ...cfg.colors, ...site })
+    .map(([k, v]) => `--${k}:${v}`).join(";");
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${Math.round(g.W)} ${Math.round(g.H)}" style="${vars}">${s}</svg>`;
+}
+
+/* ===================================================================
+   Checks — the numbers that decide whether the drawing is buildable
+   =================================================================== */
+
+function runChecks(cfg) {
+  const out = [];
+  const n = cfg.doorWidths.length;
+
+  const used = 2 * cfg.cornerReturnFt + cfg.pierFt * (n - 1) +
+               cfg.doorWidths.reduce((a, b) => a + b, 0);
+  const left = cfg.widthFt - used;
+  out.push({
+    ok: Math.abs(left) < 0.01,
+    label: "Wall accounted for",
+    value: left === 0 ? "exact" : (left > 0 ? `${left.toFixed(1)}' spare` : `${(-left).toFixed(1)}' over`)
+  });
+
+  // headroom band at 7'-6"
+  const half = cfg.depthFt / 2;
+  const xAt = 7.5 / (cfg.pitch / 12);
+  const band = xAt < half ? 2 * (half - xAt) : 0;
+  out.push({
+    ok: band >= 5,
+    label: "Band at 7'-6\" headroom",
+    value: band > 0 ? `${band.toFixed(1)}' wide` : "none"
+  });
+
+  // ridge height above plate
+  const ridgeFt = half * (cfg.pitch / 12);
+  out.push({ ok: true, label: "Ridge above plate", value: `${ridgeFt.toFixed(1)}'` });
+
+  // dormer clearance under the ridge
+  if (cfg.showDormers) {
+    cfg.dormerWidths.forEach((w, i) => {
+      if (!w) return;
+      const peak = cfg.dormerWallFt + (w / 2) * (cfg.pitch / 12);
+      const clear = ridgeFt - peak;
+      out.push({
+        ok: clear >= 1.5,
+        label: `Dormer ${i + 1} (${w}') under ridge`,
+        value: `${(clear * 12).toFixed(0)}"`
+      });
+    });
+  }
+
+  // stair run against the depth available
+  if (cfg.showStairs) {
+    const risers = Math.round((cfg.wallHeightFt * 12) / cfg.riserInches);
+    const run = risers * cfg.treadInches / 12;
+    out.push({
+      ok: run <= cfg.depthFt - 3,
+      label: `Stair run (${risers} risers)`,
+      value: `${run.toFixed(1)}' in ${cfg.depthFt}'`
+    });
+  }
+
+  return out;
+}
+
+/* ===================================================================
+   UI
+   =================================================================== */
+
+const FIELDS_BUILDING = [
+  ["widthFt", "Width (ft)", 8, 80, 1],
+  ["depthFt", "Depth (ft)", 8, 60, 1],
+  ["wallHeightFt", "Wall height (ft)", 7, 20, 0.5],
+  ["pitch", "Pitch (/12)", 2, 16, 1],
+  ["overhangInches", "Overhang (in)", 0, 36, 1],
+  ["curbInches", "Curb (in)", 0, 24, 1],
+  ["houseGapFt", "Gap to house (ft)", 4, 60, 1],
+  ["pxPerFt", "Scale (px/ft)", 6, 40, 1]
+];
+
+const FIELDS_DOORS = [
+  ["door0", "Door 1 (ft)", 6, 24, 1],
+  ["door1", "Door 2 (ft)", 0, 24, 1],
+  ["doorHeightFt", "Door height (ft)", 6, 16, 0.5],
+  ["cornerReturnFt", "Corner return (ft)", 0.5, 10, 0.5],
+  ["pierFt", "Pier between (ft)", 0.5, 10, 0.5],
+  ["dormer0", "Dormer 1 (ft)", 0, 20, 1],
+  ["dormer1", "Dormer 2 (ft)", 0, 20, 1],
+  ["dormerWallFt", "Dormer wall (ft)", 2, 8, 0.5],
+  ["stairWidthFt", "Stair width (ft)", 3, 8, 0.5]
+];
+
+function readVirtual(key) {
+  if (key === "door0") return CONFIG.doorWidths[0];
+  if (key === "door1") return CONFIG.doorWidths[1] ?? 0;
+  if (key === "dormer0") return CONFIG.dormerWidths[0];
+  if (key === "dormer1") return CONFIG.dormerWidths[1] ?? 0;
+  return CONFIG[key];
+}
+
+function writeVirtual(key, v) {
+  if (key === "door0") { CONFIG.doorWidths[0] = v; return; }
+  if (key === "door1") {
+    if (v > 0) { CONFIG.doorWidths[1] = v; CONFIG.dormerWidths[1] = CONFIG.dormerWidths[1] ?? 0; }
+    else { CONFIG.doorWidths.length = 1; CONFIG.dormerWidths.length = 1; }
+    return;
+  }
+  if (key === "dormer0") { CONFIG.dormerWidths[0] = v; return; }
+  if (key === "dormer1") { CONFIG.dormerWidths[1] = v; return; }
+  CONFIG[key] = v;
+}
+
+function buildControls(hostId, fields) {
+  const host = document.getElementById(hostId);
+  fields.forEach(([key, label, min, max, step]) => {
+    const l = document.createElement("label");
+    l.innerHTML = `<span>${label}</span>`;
+    const inp = document.createElement("input");
+    inp.type = "number";
+    inp.min = min; inp.max = max; inp.step = step;
+    inp.value = readVirtual(key);
+    inp.addEventListener("input", () => {
+      const v = parseFloat(inp.value);
+      if (!Number.isNaN(v)) { writeVirtual(key, v); render(); }
+    });
+    l.appendChild(inp);
+    host.appendChild(l);
+  });
+}
+
+function buildToggles() {
+  const host = document.getElementById("ctlDoors");
+  [["showDormers", "Dormers"], ["showStairs", "Stairs"], ["showHouse", "Show house"]]
+    .forEach(([key, label]) => {
+      const l = document.createElement("label");
+      l.className = "check";
+      const inp = document.createElement("input");
+      inp.type = "checkbox";
+      inp.checked = CONFIG[key];
+      inp.addEventListener("change", () => { CONFIG[key] = inp.checked; render(); });
+      l.appendChild(inp);
+      l.appendChild(document.createTextNode(label));
+      host.appendChild(l);
+    });
+}
+
+function buildAppearanceControls() {
+  const host = document.getElementById("ctlAppearance");
+
+  const paletteLabel = document.createElement("label");
+  paletteLabel.innerHTML = `<span>Color palette</span>`;
+  const paletteSel = document.createElement("select");
+  paletteSel.innerHTML = `<option value="">Custom</option>` +
+    PALETTES.map((p, i) => `<option value="${i}">${p.name}</option>`).join("");
+  paletteSel.addEventListener("change", () => {
+    if (paletteSel.value === "") return;
+    CONFIG.colors = { ...PALETTES[+paletteSel.value].c };
+    refreshColorInputs();
+    render();
+  });
+  paletteLabel.appendChild(paletteSel);
+  host.appendChild(paletteLabel);
+
+  const sidingLabel = document.createElement("label");
+  sidingLabel.innerHTML = `<span>Siding type</span>`;
+  const sidingSel = document.createElement("select");
+  sidingSel.innerHTML = SIDING_TYPES.map(t => `<option value="${t.id}">${t.name}</option>`).join("");
+  sidingSel.value = CONFIG.siding;
+  sidingSel.addEventListener("change", () => { CONFIG.siding = sidingSel.value; render(); });
+  sidingLabel.appendChild(sidingSel);
+  host.appendChild(sidingLabel);
+
+  // matching a palette exactly re-selects it in the dropdown; editing any
+  // swatch afterward falls back to "Custom"
+  window._syncPaletteSelect = () => {
+    const idx = PALETTES.findIndex(p =>
+      COLOR_ROLES.every(([key]) => p.c[key] === CONFIG.colors[key]));
+    paletteSel.value = idx === -1 ? "" : String(idx);
+  };
+  window._syncPaletteSelect();
+}
+
+function refreshColorInputs() {
+  COLOR_ROLES.forEach(([key]) => {
+    const inp = document.getElementById("clr-" + key);
+    if (inp) inp.value = CONFIG.colors[key];
+  });
+  if (window._syncPaletteSelect) window._syncPaletteSelect();
+}
+
+function buildColorControls() {
+  const host = document.getElementById("ctlColors");
+  COLOR_ROLES.forEach(([key, label]) => {
+    const l = document.createElement("label");
+    l.className = "swatch";
+    l.innerHTML = `<span>${label}</span>`;
+    const inp = document.createElement("input");
+    inp.type = "color";
+    inp.id = "clr-" + key;
+    inp.value = CONFIG.colors[key];
+    inp.addEventListener("input", () => {
+      CONFIG.colors[key] = inp.value;
+      if (window._syncPaletteSelect) window._syncPaletteSelect();
+      render();
+    });
+    l.appendChild(inp);
+    host.appendChild(l);
+  });
+}
+
+function saveSVG(markup, name) {
+  const blob = new Blob([markup], { type: "image/svg+xml" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function render() {
+  // checks
+  const cs = document.getElementById("checks");
+  cs.innerHTML = runChecks(CONFIG).map(c =>
+    `<div class="chk ${c.ok ? "ok" : "warn"}"><span class="dot"></span>` +
+    `<span><span class="lbl">${c.label}</span> <b>${c.value}</b></span></div>`
+  ).join("");
+
+  // drawing
+  const out = document.getElementById("out");
+  out.innerHTML = "";
+  const sidingName = SIDING_TYPES.find(t => t.id === CONFIG.siding)?.name ?? CONFIG.siding;
+  const svg = drawGarage(CONFIG, "s0");
+  const wrap = document.createElement("div");
+  wrap.className = "scheme";
+  wrap.innerHTML =
+    `<div class="shead"><h3>Elevation</h3><span class="mat">${sidingName}</span>` +
+    `<button type="button">Save SVG</button></div>` +
+    `<div class="art">${svg}</div>`;
+  wrap.querySelector("button").addEventListener("click", () =>
+    saveSVG(svg, "garage-elevation.svg"));
+  out.appendChild(wrap);
+}
+
+buildControls("ctlBuilding", FIELDS_BUILDING);
+buildControls("ctlDoors", FIELDS_DOORS);
+buildToggles();
+buildAppearanceControls();
+buildColorControls();
+render();
+</script>
+</body>
+</html>

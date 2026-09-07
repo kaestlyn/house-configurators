@@ -4,96 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Porch Elevation Tool</title>
-<style>
-  :root {
-    --paper:#F4F2EE; --sunk:#EAE6E0; --ink:#26201D; --muted:#766C66;
-    --line:#DCD6CD; --accent:#9E4A38; --ok:#3F6B47; --warn:#8A6A21;
-    --mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
-    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --paper:#191614; --sunk:#14110F; --ink:#EDE7E1; --muted:#A0968E;
-      --line:#37312C; --accent:#D5826A; --ok:#7FB08A; --warn:#C9A44E;
-    }
-  }
-  * { box-sizing:border-box; }
-  body { margin:0; background:var(--paper); color:var(--ink);
-         font-family:var(--sans); font-size:15px; line-height:1.55; }
-  .wrap { max-width:1180px; margin:0 auto; padding:20px 24px 60px; }
-
-  nav.tools {
-    display:flex; gap:2px; border-bottom:1px solid var(--line);
-    background:var(--sunk); padding:0 24px;
-  }
-  nav.tools a {
-    font-family:var(--mono); font-size:11.5px; letter-spacing:0.06em; text-transform:uppercase;
-    color:var(--muted); text-decoration:none; padding:13px 14px;
-    border-bottom:2px solid transparent;
-  }
-  nav.tools a:hover { color:var(--ink); }
-  nav.tools a.active { color:var(--accent); border-bottom-color:var(--accent); }
-
-  h1 { font-size:26px; margin:0 0 6px; font-weight:600; letter-spacing:-0.01em; }
-  .sub { color:var(--muted); margin:0 0 28px; max-width:64ch; }
-  code { font-family:var(--mono); font-size:0.92em; background:var(--sunk); padding:1px 5px; border-radius:3px; }
-
-  .tabbar { display:flex; gap:4px; margin:24px 0 0; border-bottom:1px solid var(--line); }
-  .tabbar button {
-    font-family:var(--mono); font-size:11px; font-weight:500; letter-spacing:0.1em;
-    text-transform:uppercase; padding:10px 14px; margin-bottom:-1px; cursor:pointer;
-    background:none; border:none; border-bottom:2px solid transparent; color:var(--muted);
-  }
-  .tabbar button:hover { color:var(--ink); }
-  .tabbar button.active { color:var(--accent); border-bottom-color:var(--accent); }
-
-  .panel { background:var(--sunk); border:1px solid var(--line); border-top:none; padding:20px 22px; margin-bottom:14px; }
-  .tabpanel { display:none; }
-  .tabpanel.active { display:block; }
-  .panel h2 { font-family:var(--mono); font-size:11px; font-weight:500; letter-spacing:0.14em;
-              text-transform:uppercase; color:var(--accent); margin:0 0 14px; }
-  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px 18px; }
-  label { display:flex; flex-direction:column; gap:4px; font-size:12.5px; color:var(--muted); }
-  label span { font-family:var(--mono); letter-spacing:0.04em; text-transform:uppercase; font-size:10.5px; }
-  input[type=number], select {
-    font-family:var(--mono); font-size:14px; padding:6px 8px;
-    background:var(--paper); color:var(--ink);
-    border:1px solid var(--line); border-radius:3px; width:100%;
-  }
-  label.check { flex-direction:row; align-items:center; gap:8px; font-size:13px; }
-  input[type=checkbox] { width:16px; height:16px; accent-color:var(--accent); }
-
-  .swatches { display:grid; grid-template-columns:repeat(auto-fit,minmax(110px,1fr)); gap:12px 18px; margin-top:16px; }
-  .swatch { display:flex; flex-direction:column; gap:4px; font-size:12.5px; color:var(--muted); }
-  .swatch span { font-family:var(--mono); letter-spacing:0.04em; text-transform:uppercase; font-size:10.5px; }
-  input[type=color] {
-    width:100%; height:30px; padding:2px; background:var(--paper);
-    border:1px solid var(--line); border-radius:3px; cursor:pointer;
-  }
-  .swatch select.copyfrom {
-    font-size:10.5px; padding:3px 4px; margin-top:2px;
-  }
-
-  .checks { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:10px 20px; }
-  .chk { font-family:var(--mono); font-size:12.5px; line-height:1.5; display:flex; gap:8px; align-items:baseline; }
-  .chk .dot { width:8px; height:8px; border-radius:50%; flex:none; margin-top:5px; }
-  .chk.ok .dot { background:var(--ok); }
-  .chk.warn .dot { background:var(--warn); }
-  .chk b { font-weight:600; }
-  .chk .lbl { color:var(--muted); }
-
-  #out .scheme { margin-top:0; }
-  .shead { display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; margin-bottom:8px; }
-  .shead h3 { margin:0; font-size:18px; font-weight:600; }
-  .shead .mat { font-family:var(--mono); font-size:11.5px; color:var(--muted); letter-spacing:0.04em; }
-  .shead .actions { margin-left:auto; display:flex; gap:8px; }
-  .shead button { font-family:var(--mono); font-size:11px; letter-spacing:0.08em;
-    text-transform:uppercase; padding:5px 11px; cursor:pointer;
-    background:var(--paper); color:var(--ink); border:1px solid var(--line); border-radius:3px; }
-  .shead button:hover { border-color:var(--accent); color:var(--accent); }
-  .art { background:var(--sunk); border:1px solid var(--line); line-height:0; overflow:hidden; }
-  .art svg { display:block; width:100%; height:auto; }
-</style>
+<link rel="stylesheet" href="shared.css">
 </head>
 <body>
 <nav class="tools">
@@ -134,6 +45,7 @@
   </div>
 </div>
 
+<script src="shared.js"></script>
 <script>
 "use strict";
 
@@ -148,6 +60,7 @@ const CONFIG = {
   postSizeIn:        5.5,   // 6x6 actual
   openingHeightFt:   7,     // deck to underside of header
   railHeightFt:      3.4,   // deck to top of handrail
+  railBotFt:         0.78,  // deck to bottom rail
   deckAboveGradeFt:  2.5,   // deck surface above grade
   transomTallFt:     2.3,   // transom height at the house end
   transomShortFt:    1.0,   // transom height at the far end
@@ -166,7 +79,7 @@ const CONFIG = {
 
   // appearance — a starting palette, freely editable below
   colors: { post:"#8B5A2E", beam:"#8B5A2E", rail:"#8B5A2E", spindle:"#7E5029",
-            floor:"#6F4522", skirt:"#8B5A2E", skirtbg:"#3A2A1B", interior:"#2F2C28" }
+            floor:"#6F4522", riser:"#6F4522", skirt:"#8B5A2E", skirtbg:"#3A2A1B", interior:"#2F2C28" }
 };
 
 /* Pre-configured color palettes. Any of these can be loaded, then tweaked
@@ -175,16 +88,16 @@ const CONFIG = {
 const PALETTES = [
   { name:"As it stands", c:{
       post:"#8B5A2E", beam:"#8B5A2E", rail:"#8B5A2E", spindle:"#7E5029",
-      floor:"#6F4522", skirt:"#8B5A2E", skirtbg:"#3A2A1B", interior:"#2F2C28" } },
+      floor:"#6F4522", riser:"#6F4522", skirt:"#8B5A2E", skirtbg:"#3A2A1B", interior:"#2F2C28" } },
   { name:"Trim white, dark floor", c:{
       post:"#EFEBE2", beam:"#EFEBE2", rail:"#EFEBE2", spindle:"#EFEBE2",
-      floor:"#3B3430", skirt:"#EFEBE2", skirtbg:"#2A2522", interior:"#2E2C29" } },
+      floor:"#3B3430", riser:"#3B3430", skirt:"#EFEBE2", skirtbg:"#2A2522", interior:"#2E2C29" } },
   { name:"Charcoal throughout", c:{
       post:"#343230", beam:"#343230", rail:"#343230", spindle:"#2C2A28",
-      floor:"#2A2724", skirt:"#343230", skirtbg:"#1E1C1A", interior:"#242220" } },
+      floor:"#2A2724", riser:"#2A2724", skirt:"#343230", skirtbg:"#1E1C1A", interior:"#242220" } },
   { name:"White frame, black rail", c:{
       post:"#EFEBE2", beam:"#EFEBE2", rail:"#EFEBE2", spindle:"#2C2A27",
-      floor:"#3B3430", skirt:"#EFEBE2", skirtbg:"#2A2522", interior:"#2E2C29" } }
+      floor:"#3B3430", riser:"#3B3430", skirt:"#EFEBE2", skirtbg:"#2A2522", interior:"#2E2C29" } }
 ];
 
 const COLOR_ROLES = [
@@ -192,7 +105,8 @@ const COLOR_ROLES = [
   ["beam",     "Beam / header"],
   ["rail",     "Rail"],
   ["spindle",  "Spindles"],
-  ["floor",    "Floor / treads"],
+  ["floor",    "Tread (horizontal)"],
+  ["riser",    "Riser (vertical)"],
   ["skirt",    "Skirt trim"],
   ["skirtbg",  "Skirt background"],
   ["interior", "Interior (screen)"]
@@ -247,7 +161,7 @@ function geometry(cfg) {
 
   const railTopY = deckTopY - ft(cfg.railHeightFt);
   const railTopH = ft(0.45);
-  const railBotY = deckTopY - ft(0.78);
+  const railBotY = deckTopY - ft(cfg.railBotFt);
   const railBotH = ft(0.42);
 
   // rake: roof underside falls from the house end to the far end
@@ -366,10 +280,11 @@ function landingSteps(L, g, cfg) {
   // shadow on the skirt behind
   s += rect(L.la - 6, LT, L.landW + 12, g.groundY - LT, "rgba(0,0,0,0.30)");
 
-  // landing
-  s += rect(L.la, LT, L.landW, LF, "var(--floor)");
+  // landing — riser-colored fascia with a tread-colored cap along the top
+  s += rect(L.la, LT, L.landW, LF, "var(--riser)");
   s += rect(L.la, LT, L.landW, LF, "rgba(255,255,255,0.12)");
-  s += rect(L.la, LT, L.landW, 5, "rgba(255,255,255,0.32)");
+  s += rect(L.la, LT, L.landW, Math.min(g.inch(2), LF), "var(--floor)");
+  s += rect(L.la, LT, L.landW, 2, "rgba(255,255,255,0.32)");
   s += rect(L.la, LT + LF - 3, L.landW, 3, "rgba(0,0,0,0.34)");
 
   // steps
@@ -377,9 +292,10 @@ function landingSteps(L, g, cfg) {
     const w = L.stairW + grow * (i / Math.max(1, n - 1));
     const cxS = (L.sa + L.sb) / 2;
     const y = LT + LF + i * stepH;
-    s += rect(cxS - w / 2, y, w, stepH, "var(--floor)");
+    s += rect(cxS - w / 2, y, w, stepH, "var(--riser)");
     s += rect(cxS - w / 2, y, w, stepH, "rgba(255,255,255,0.12)");
-    s += rect(cxS - w / 2, y, w, 4.5, "rgba(255,255,255,0.32)");
+    s += rect(cxS - w / 2, y, w, Math.min(g.inch(2), stepH), "var(--floor)");
+    s += rect(cxS - w / 2, y, w, 2, "rgba(255,255,255,0.32)");
     s += rect(cxS - w / 2, y + stepH - 3, w, 3, "rgba(0,0,0,0.34)");
   }
 
@@ -583,21 +499,30 @@ function runChecks(cfg) {
    UI
    =================================================================== */
 
-const FIELDS_PORCH = [
+const FIELDS_PORCH_LAYOUT = [
   ["bays", "Bays drawn", 1, 12, 1],
   ["bayWidthFt", "Bay width, avg (ft)", 2, 12, 0.1],
-  ["postSizeIn", "Post size (in)", 3, 12, 0.5],
+  ["postSizeIn", "Post size (in)", 3, 12, 0.5]
+];
+const FIELDS_PORCH_OPENINGS = [
   ["openingHeightFt", "Opening height (ft)", 4, 12, 0.1],
-  ["railHeightFt", "Rail height (ft)", 2.5, 4.5, 0.1],
-  ["deckAboveGradeFt", "Deck above grade (ft)", 0.5, 8, 0.25],
   ["transomTallFt", "Transom, house end (ft)", 0, 6, 0.1],
-  ["transomShortFt", "Transom, far end (ft)", 0, 6, 0.1],
+  ["transomShortFt", "Transom, far end (ft)", 0, 6, 0.1]
+];
+const FIELDS_PORCH_RAIL_DECK = [
+  ["railHeightFt", "Rail height (ft)", 2.5, 4.5, 0.1],
+  ["railBotFt", "Rail bottom, from floor (ft)", 0.3, 2, 0.05],
+  ["deckAboveGradeFt", "Deck above grade (ft)", 0.5, 8, 0.25]
+];
+const FIELDS_PORCH_SCALE = [
   ["pxPerFt", "Scale (px/ft)", 10, 60, 1]
 ];
 
 const FIELDS_DOOR = [
   ["doorBay", "Door in bay #", 1, 12, 1],
-  ["doorWidthFt", "Door width (ft)", 2, 6, 0.5],
+  ["doorWidthFt", "Door width (ft)", 2, 6, 0.5]
+];
+const FIELDS_LANDING = [
   ["stairPct", "Stairs (% of landing)", 20, 100, 5],
   ["riserInches", "Riser (in)", 4, 8, 0.25]
 ];
@@ -648,112 +573,35 @@ function buildToggle(hostId, key, label) {
   host.appendChild(l);
 }
 
-function buildAppearanceControls() {
-  const host = document.getElementById("ctlAppearance");
 
-  const paletteLabel = document.createElement("label");
-  paletteLabel.innerHTML = `<span>Color palette</span>`;
-  const paletteSel = document.createElement("select");
-  paletteSel.innerHTML = `<option value="">Custom</option>` +
-    PALETTES.map((p, i) => `<option value="${i}">${p.name}</option>`).join("");
-  paletteSel.addEventListener("change", () => {
-    if (paletteSel.value === "") return;
-    CONFIG.colors = { ...PALETTES[+paletteSel.value].c };
-    refreshColorInputs();
-    render();
-  });
-  paletteLabel.appendChild(paletteSel);
-  host.appendChild(paletteLabel);
-
-  // matching a palette exactly re-selects it in the dropdown; editing any
-  // swatch afterward falls back to "Custom"
-  window._syncPaletteSelect = () => {
-    const idx = PALETTES.findIndex(p =>
-      COLOR_ROLES.every(([key]) => p.c[key] === CONFIG.colors[key]));
-    paletteSel.value = idx === -1 ? "" : String(idx);
-  };
-  window._syncPaletteSelect();
-}
-
-function refreshColorInputs() {
-  COLOR_ROLES.forEach(([key]) => {
-    const inp = document.getElementById("clr-" + key);
-    if (inp) inp.value = CONFIG.colors[key];
-  });
-  if (window._syncPaletteSelect) window._syncPaletteSelect();
-}
-
-function buildColorControls() {
-  const host = document.getElementById("ctlColors");
-  COLOR_ROLES.forEach(([key, label]) => {
-    const l = document.createElement("label");
-    l.className = "swatch";
-    l.innerHTML = `<span>${label}</span>`;
-    const inp = document.createElement("input");
-    inp.type = "color";
-    inp.id = "clr-" + key;
-    inp.value = CONFIG.colors[key];
-    inp.addEventListener("input", () => {
-      CONFIG.colors[key] = inp.value;
-      if (window._syncPaletteSelect) window._syncPaletteSelect();
-      render();
-    });
-    l.appendChild(inp);
-
-    // "copy from" — pick another role to pull its current color into this one
-    const copy = document.createElement("select");
-    copy.className = "copyfrom";
-    copy.innerHTML = `<option value="">Copy from…</option>` +
-      COLOR_ROLES.filter(([k]) => k !== key)
-        .map(([k, lbl]) => `<option value="${k}">${lbl}</option>`).join("");
-    copy.addEventListener("change", () => {
-      if (!copy.value) return;
-      CONFIG.colors[key] = CONFIG.colors[copy.value];
-      inp.value = CONFIG.colors[key];
-      copy.value = "";
-      if (window._syncPaletteSelect) window._syncPaletteSelect();
-      render();
-    });
-    l.appendChild(copy);
-
-    host.appendChild(l);
-  });
-}
-
-function saveSVG(markup, name) {
-  const blob = new Blob([markup], { type: "image/svg+xml" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url; a.download = name;
-  document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
-
-/* Share links — the whole CONFIG, packed into a URL-safe base64 blob in
-   the "c" query param, so a link fully reproduces the configuration. */
-function encodeConfig(cfg) {
-  const json = JSON.stringify(cfg);
-  return btoa(unescape(encodeURIComponent(json)))
-    .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-}
-function decodeConfig(str) {
-  try {
-    let b64 = str.replace(/-/g, "+").replace(/_/g, "/");
-    while (b64.length % 4) b64 += "=";
-    return JSON.parse(decodeURIComponent(escape(atob(b64))));
-  } catch (e) { return null; }
-}
-function loadFromURL() {
-  const c = new URLSearchParams(location.search).get("c");
-  if (!c) return;
-  const parsed = decodeConfig(c);
-  if (parsed) Object.assign(CONFIG, parsed);
-}
-function updateURL() {
-  const url = new URL(location.href);
-  url.searchParams.set("c", encodeConfig(CONFIG));
-  history.replaceState(null, "", url);
-}
+/* Share links — see shared.js for the codec itself. This schema is
+   page-specific: it lists CONFIG's fields, their short wire codes, and
+   how to (de)serialize each one. Once a code has shipped, never reassign
+   it to a different field — mint a new code instead; it's safe to add,
+   remove, or reorder entries here freely. */
+const SHARE_SCHEMA = {
+  bays:             { code: "ba",  type: "num" },
+  bayWidthFt:       { code: "bw",  type: "num" },
+  postSizeIn:       { code: "ps",  type: "num" },
+  openingHeightFt:  { code: "oh",  type: "num" },
+  railHeightFt:     { code: "rh",  type: "num" },
+  railBotFt:        { code: "rb",  type: "num" },
+  deckAboveGradeFt: { code: "dg",  type: "num" },
+  transomTallFt:    { code: "tt",  type: "num" },
+  transomShortFt:   { code: "ts",  type: "num" },
+  showDoor:         { code: "sd",  type: "bool" },
+  doorBay:          { code: "db",  type: "num" },
+  doorWidthFt:      { code: "dw",  type: "num" },
+  doorSwingOut:     { code: "so",  type: "bool" },
+  landingBays:      { code: "lb",  type: "num" },
+  stairPct:         { code: "sp",  type: "num" },
+  stairAlign:       { code: "sa",  type: "str" },
+  riserInches:      { code: "ri",  type: "num" },
+  pxPerFt:          { code: "px",  type: "num" },
+  colors:           { code: "col", type: "colors" }
+};
+const COLOR_KEYS = COLOR_ROLES.map(([k]) => k);
+const share = createShareLink(CONFIG, SHARE_SCHEMA, COLOR_KEYS);
 
 function render() {
   document.getElementById("checks").innerHTML = runChecks(CONFIG).map(c =>
@@ -763,51 +611,62 @@ function render() {
   const out = document.getElementById("out");
   out.innerHTML = "";
   const svg = drawPorch(CONFIG, "p0");
+
   const wrap = document.createElement("div");
   wrap.className = "scheme";
-  wrap.innerHTML =
-    `<div class="shead"><h3>Elevation</h3>` +
-    `<div class="actions">` +
-    `<button type="button" class="save">Save SVG</button>` +
-    `<button type="button" class="share">Copy link</button>` +
-    `</div></div><div class="art">${svg}</div>`;
-  wrap.querySelector(".save").addEventListener("click", () =>
-    saveSVG(svg, "porch-elevation.svg"));
-  const shareBtn = wrap.querySelector(".share");
-  shareBtn.addEventListener("click", () => {
-    updateURL();
-    navigator.clipboard.writeText(location.href).then(() => {
-      const orig = shareBtn.textContent;
-      shareBtn.textContent = "Copied!";
-      setTimeout(() => { shareBtn.textContent = orig; }, 1200);
-    });
-  });
+
+  const shead = document.createElement("div");
+  shead.className = "shead";
+  shead.innerHTML = `<h3>Elevation</h3>`;
+  shead.appendChild(buildElevationActions({
+    getSvg: () => svg,
+    filenames: { svg: "porch-elevation.svg", png: "porch-elevation.png" },
+    updateURL: share.updateURL
+  }));
+
+  const art = document.createElement("div");
+  art.className = "art";
+  art.innerHTML = svg;
+  attachImageContextMenu(art, { getSvg: () => svg, filename: "porch-elevation.png", updateURL: share.updateURL });
+
+  wrap.appendChild(shead);
+  wrap.appendChild(art);
   out.appendChild(wrap);
 
-  updateURL();
+  share.afterRender();
 }
 
-loadFromURL();
-buildNumbers("ctlPorch", FIELDS_PORCH);
+share.loadFromURL();
+
+insertFieldGroup("ctlPorch", "Layout");
+buildNumbers("ctlPorch", FIELDS_PORCH_LAYOUT);
+insertFieldGroup("ctlPorch", "Openings");
+buildNumbers("ctlPorch", FIELDS_PORCH_OPENINGS);
+insertFieldGroup("ctlPorch", "Rail & deck");
+buildNumbers("ctlPorch", FIELDS_PORCH_RAIL_DECK);
+insertFieldGroup("ctlPorch", "Scale");
+buildNumbers("ctlPorch", FIELDS_PORCH_SCALE);
+
+insertFieldGroup("ctlDoor", "Door");
 buildNumbers("ctlDoor", FIELDS_DOOR);
-buildSelect("ctlDoor", "landingBays", "Landing size",
-  [[1, "1 bay"], [1.5, "1.5 bays"], [2, "2 bays"]]);
-buildSelect("ctlDoor", "stairAlign", "Stair alignment",
-  [["center", "Center"], ["left", "Left"], ["right", "Right"]]);
 buildToggle("ctlDoor", "showDoor", "Door + landing");
 buildToggle("ctlDoor", "doorSwingOut", "Swings out");
-buildAppearanceControls();
-buildColorControls();
+insertFieldGroup("ctlDoor", "Landing & stairs");
+buildSelect("ctlDoor", "landingBays", "Landing size",
+  [[1, "1 bay"], [1.5, "1.5 bays"], [2, "2 bays"]]);
+buildNumbers("ctlDoor", FIELDS_LANDING);
+buildSelect("ctlDoor", "stairAlign", "Stair alignment",
+  [["center", "Center"], ["left", "Left"], ["right", "Right"]]);
 
-function initTabs() {
-  const buttons = document.querySelectorAll(".tabbar button");
-  buttons.forEach(btn => btn.addEventListener("click", () => {
-    buttons.forEach(b => b.classList.remove("active"));
-    btn.classList.add("active");
-    document.querySelectorAll(".tabpanel").forEach(p => p.classList.remove("active"));
-    document.getElementById(btn.dataset.tab).classList.add("active");
-  }));
-}
+buildAppearanceSection({
+  paletteHostId: "ctlAppearance",
+  swatchHostId: "ctlColors",
+  palettes: PALETTES,
+  colorRoles: COLOR_ROLES,
+  config: CONFIG,
+  onChange: render,
+  exportName: "porch-palette.png"
+});
 initTabs();
 
 render();

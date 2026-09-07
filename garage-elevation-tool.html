@@ -4,111 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Garage Elevation Tool</title>
-<style>
-  :root {
-    --paper:#F4F2EE; --sunk:#EAE6E0; --ink:#26201D; --muted:#766C66;
-    --line:#DCD6CD; --accent:#9E4A38; --ok:#3F6B47; --warn:#8A6A21;
-    --sky:#CBD8DF; --grass:#8C9A72; --drive:#C6C2BB;
-    --mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
-    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --paper:#191614; --sunk:#14110F; --ink:#EDE7E1; --muted:#A0968E;
-      --line:#37312C; --accent:#D5826A; --ok:#7FB08A; --warn:#C9A44E;
-      --sky:#2B3941; --grass:#454F3B; --drive:#3A3733;
-    }
-  }
-  * { box-sizing: border-box; }
-  body {
-    margin:0; background:var(--paper); color:var(--ink);
-    font-family:var(--sans); font-size:15px; line-height:1.55;
-  }
-  .wrap { max-width:1180px; margin:0 auto; padding:20px 24px 60px; }
-
-  /* ---- nav ---- */
-  nav.tools {
-    display:flex; gap:2px; border-bottom:1px solid var(--line);
-    background:var(--sunk); padding:0 24px;
-  }
-  nav.tools a {
-    font-family:var(--mono); font-size:11.5px; letter-spacing:0.06em; text-transform:uppercase;
-    color:var(--muted); text-decoration:none; padding:13px 14px;
-    border-bottom:2px solid transparent;
-  }
-  nav.tools a:hover { color:var(--ink); }
-  nav.tools a.active { color:var(--accent); border-bottom-color:var(--accent); }
-  h1 { font-size:26px; margin:0 0 6px; font-weight:600; letter-spacing:-0.01em; }
-  .sub { color:var(--muted); margin:0 0 28px; max-width:62ch; }
-  code { font-family:var(--mono); font-size:0.92em; background:var(--sunk); padding:1px 5px; border-radius:3px; }
-
-  /* ---- tabs ---- */
-  .tabbar { display:flex; gap:4px; margin:24px 0 0; border-bottom:1px solid var(--line); }
-  .tabbar button {
-    font-family:var(--mono); font-size:11px; font-weight:500; letter-spacing:0.1em;
-    text-transform:uppercase; padding:10px 14px; margin-bottom:-1px; cursor:pointer;
-    background:none; border:none; border-bottom:2px solid transparent; color:var(--muted);
-  }
-  .tabbar button:hover { color:var(--ink); }
-  .tabbar button.active { color:var(--accent); border-bottom-color:var(--accent); }
-
-  /* ---- controls ---- */
-  .panel {
-    background:var(--sunk); border:1px solid var(--line); border-top:none;
-    padding:20px 22px; margin-bottom:14px;
-  }
-  .tabpanel { display:none; }
-  .tabpanel.active { display:block; }
-  .panel h2 {
-    font-family:var(--mono); font-size:11px; font-weight:500; letter-spacing:0.14em;
-    text-transform:uppercase; color:var(--accent); margin:0 0 14px;
-  }
-  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px 18px; }
-  label { display:flex; flex-direction:column; gap:4px; font-size:12.5px; color:var(--muted); }
-  label span { font-family:var(--mono); letter-spacing:0.04em; text-transform:uppercase; font-size:10.5px; }
-  input[type=number], select {
-    font-family:var(--mono); font-size:14px; padding:6px 8px;
-    background:var(--paper); color:var(--ink);
-    border:1px solid var(--line); border-radius:3px; width:100%;
-  }
-  label.check { flex-direction:row; align-items:center; gap:8px; font-size:13px; }
-  input[type=checkbox] { width:16px; height:16px; accent-color:var(--accent); }
-
-  .swatches { display:grid; grid-template-columns:repeat(auto-fit,minmax(110px,1fr)); gap:12px 18px; margin-top:16px; }
-  .swatch { display:flex; flex-direction:column; gap:4px; font-size:12.5px; color:var(--muted); }
-  .swatch span { font-family:var(--mono); letter-spacing:0.04em; text-transform:uppercase; font-size:10.5px; }
-  input[type=color] {
-    width:100%; height:30px; padding:2px; background:var(--paper);
-    border:1px solid var(--line); border-radius:3px; cursor:pointer;
-  }
-  .swatch select.copyfrom {
-    font-size:10.5px; padding:3px 4px; margin-top:2px;
-  }
-
-  /* ---- checks readout ---- */
-  .checks { display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:10px 20px; }
-  .chk { font-family:var(--mono); font-size:12.5px; line-height:1.5; display:flex; gap:8px; align-items:baseline; }
-  .chk .dot { width:8px; height:8px; border-radius:50%; flex:none; margin-top:5px; }
-  .chk.ok .dot { background:var(--ok); }
-  .chk.warn .dot { background:var(--warn); }
-  .chk b { font-weight:600; }
-  .chk .lbl { color:var(--muted); }
-
-  /* ---- output ---- */
-  #out .scheme { margin-top:0; }
-  .shead { display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; margin-bottom:8px; }
-  .shead h3 { margin:0; font-size:18px; font-weight:600; }
-  .shead .mat { font-family:var(--mono); font-size:11.5px; color:var(--muted); letter-spacing:0.04em; }
-  .shead .actions { margin-left:auto; display:flex; gap:8px; }
-  .shead button {
-    font-family:var(--mono); font-size:11px; letter-spacing:0.08em;
-    text-transform:uppercase; padding:5px 11px; cursor:pointer;
-    background:var(--paper); color:var(--ink); border:1px solid var(--line); border-radius:3px;
-  }
-  .shead button:hover { border-color:var(--accent); color:var(--accent); }
-  .art { background:var(--sunk); border:1px solid var(--line); line-height:0; overflow:hidden; }
-  .art svg { display:block; width:100%; height:auto; }
-</style>
+<link rel="stylesheet" href="shared.css">
 </head>
 <body>
 <nav class="tools">
@@ -148,6 +44,7 @@
   </div>
 </div>
 
+<script src="shared.js"></script>
 <script>
 "use strict";
 
@@ -541,13 +438,17 @@ function runChecks(cfg) {
    UI
    =================================================================== */
 
-const FIELDS_BUILDING = [
+const FIELDS_BUILDING_DIMENSIONS = [
   ["widthFt", "Width (ft)", 8, 80, 1],
   ["depthFt", "Depth (ft)", 8, 60, 1],
   ["wallHeightFt", "Wall height (ft)", 7, 20, 0.5],
-  ["pitch", "Pitch (/12)", 2, 16, 1],
+  ["pitch", "Pitch (/12)", 2, 16, 1]
+];
+const FIELDS_BUILDING_ROOF = [
   ["overhangInches", "Overhang (in)", 0, 36, 1],
-  ["curbInches", "Curb (in)", 0, 24, 1],
+  ["curbInches", "Curb (in)", 0, 24, 1]
+];
+const FIELDS_BUILDING_SITE = [
   ["houseGapFt", "Gap to house (ft)", 4, 60, 1],
   ["pxPerFt", "Scale (px/ft)", 6, 40, 1]
 ];
@@ -555,12 +456,18 @@ const FIELDS_BUILDING = [
 const FIELDS_DOORS = [
   ["door0", "Door 1 (ft)", 6, 24, 1],
   ["door1", "Door 2 (ft)", 0, 24, 1],
-  ["doorTrimIn", "Door trim (in)", 2, 10, 0.5],
+  ["doorTrimIn", "Door trim (in)", 2, 10, 0.5]
+];
+const FIELDS_FRAMING = [
   ["cornerReturnFt", "Corner return (ft)", 0.5, 10, 0.5],
-  ["pierFt", "Pier between (ft)", 0.5, 10, 0.5],
+  ["pierFt", "Pier between (ft)", 0.5, 10, 0.5]
+];
+const FIELDS_DORMERS = [
   ["dormer0", "Dormer 1 (ft)", 0, 20, 1],
   ["dormer1", "Dormer 2 (ft)", 0, 20, 1],
-  ["dormerWallFt", "Dormer wall (ft)", 2, 8, 0.5],
+  ["dormerWallFt", "Dormer wall (ft)", 2, 8, 0.5]
+];
+const FIELDS_STAIRS = [
   ["stairWidthFt", "Stair width (ft)", 3, 8, 0.5]
 ];
 
@@ -591,6 +498,7 @@ function buildControls(hostId, fields) {
     l.innerHTML = `<span>${label}</span>`;
     const inp = document.createElement("input");
     inp.type = "number";
+    inp.id = "fld-" + key;
     inp.min = min; inp.max = max; inp.step = step;
     inp.value = readVirtual(key);
     inp.addEventListener("input", () => {
@@ -599,6 +507,39 @@ function buildControls(hostId, fields) {
     });
     l.appendChild(inp);
     host.appendChild(l);
+  });
+}
+
+function refreshField(key) {
+  const inp = document.getElementById("fld-" + key);
+  if (inp) inp.value = readVirtual(key);
+}
+
+function buildButton(hostId, label, onClick) {
+  const host = document.getElementById(hostId);
+  const l = document.createElement("label");
+  l.innerHTML = `<span>&nbsp;</span>`;
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.textContent = label;
+  btn.addEventListener("click", onClick);
+  l.appendChild(btn);
+  host.appendChild(l);
+}
+
+function buildSwapDoorsButton() {
+  buildButton("ctlDoors", "Swap doors", () => {
+    CONFIG.doorWidths.reverse();
+    refreshField("door0"); refreshField("door1");
+    render();
+  });
+}
+
+function buildSwapDormersButton() {
+  buildButton("ctlDoors", "Swap dormers", () => {
+    CONFIG.dormerWidths.reverse();
+    refreshField("dormer0"); refreshField("dormer1");
+    render();
   });
 }
 
@@ -616,137 +557,50 @@ function buildDoorHeightSelect() {
   host.appendChild(l);
 }
 
-function buildToggles() {
-  const host = document.getElementById("ctlDoors");
-  [["showDormers", "Dormers"], ["showStairs", "Stairs"], ["showHouse", "Show house"]]
-    .forEach(([key, label]) => {
-      const l = document.createElement("label");
-      l.className = "check";
-      const inp = document.createElement("input");
-      inp.type = "checkbox";
-      inp.checked = CONFIG[key];
-      inp.addEventListener("change", () => { CONFIG[key] = inp.checked; render(); });
-      l.appendChild(inp);
-      l.appendChild(document.createTextNode(label));
-      host.appendChild(l);
-    });
+function buildToggle(hostId, key, label) {
+  const host = document.getElementById(hostId);
+  const l = document.createElement("label");
+  l.className = "check";
+  const inp = document.createElement("input");
+  inp.type = "checkbox";
+  inp.checked = CONFIG[key];
+  inp.addEventListener("change", () => { CONFIG[key] = inp.checked; render(); });
+  l.appendChild(inp);
+  l.appendChild(document.createTextNode(label));
+  host.appendChild(l);
 }
 
-function buildAppearanceControls() {
-  const host = document.getElementById("ctlAppearance");
-
-  const paletteLabel = document.createElement("label");
-  paletteLabel.innerHTML = `<span>Color palette</span>`;
-  const paletteSel = document.createElement("select");
-  paletteSel.innerHTML = `<option value="">Custom</option>` +
-    PALETTES.map((p, i) => `<option value="${i}">${p.name}</option>`).join("");
-  paletteSel.addEventListener("change", () => {
-    if (paletteSel.value === "") return;
-    CONFIG.colors = { ...PALETTES[+paletteSel.value].c };
-    refreshColorInputs();
-    render();
-  });
-  paletteLabel.appendChild(paletteSel);
-  host.appendChild(paletteLabel);
-
-  const sidingLabel = document.createElement("label");
-  sidingLabel.innerHTML = `<span>Siding type</span>`;
-  const sidingSel = document.createElement("select");
-  sidingSel.innerHTML = SIDING_TYPES.map(t => `<option value="${t.id}">${t.name}</option>`).join("");
-  sidingSel.value = CONFIG.siding;
-  sidingSel.addEventListener("change", () => { CONFIG.siding = sidingSel.value; render(); });
-  sidingLabel.appendChild(sidingSel);
-  host.appendChild(sidingLabel);
-
-  // matching a palette exactly re-selects it in the dropdown; editing any
-  // swatch afterward falls back to "Custom"
-  window._syncPaletteSelect = () => {
-    const idx = PALETTES.findIndex(p =>
-      COLOR_ROLES.every(([key]) => p.c[key] === CONFIG.colors[key]));
-    paletteSel.value = idx === -1 ? "" : String(idx);
-  };
-  window._syncPaletteSelect();
-}
-
-function refreshColorInputs() {
-  COLOR_ROLES.forEach(([key]) => {
-    const inp = document.getElementById("clr-" + key);
-    if (inp) inp.value = CONFIG.colors[key];
-  });
-  if (window._syncPaletteSelect) window._syncPaletteSelect();
-}
-
-function buildColorControls() {
-  const host = document.getElementById("ctlColors");
-  COLOR_ROLES.forEach(([key, label]) => {
-    const l = document.createElement("label");
-    l.className = "swatch";
-    l.innerHTML = `<span>${label}</span>`;
-    const inp = document.createElement("input");
-    inp.type = "color";
-    inp.id = "clr-" + key;
-    inp.value = CONFIG.colors[key];
-    inp.addEventListener("input", () => {
-      CONFIG.colors[key] = inp.value;
-      if (window._syncPaletteSelect) window._syncPaletteSelect();
-      render();
-    });
-    l.appendChild(inp);
-
-    // "copy from" — pick another role to pull its current color into this one
-    const copy = document.createElement("select");
-    copy.className = "copyfrom";
-    copy.innerHTML = `<option value="">Copy from…</option>` +
-      COLOR_ROLES.filter(([k]) => k !== key)
-        .map(([k, lbl]) => `<option value="${k}">${lbl}</option>`).join("");
-    copy.addEventListener("change", () => {
-      if (!copy.value) return;
-      CONFIG.colors[key] = CONFIG.colors[copy.value];
-      inp.value = CONFIG.colors[key];
-      copy.value = "";
-      if (window._syncPaletteSelect) window._syncPaletteSelect();
-      render();
-    });
-    l.appendChild(copy);
-
-    host.appendChild(l);
-  });
-}
-
-function saveSVG(markup, name) {
-  const blob = new Blob([markup], { type: "image/svg+xml" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url; a.download = name;
-  document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
-
-/* Share links — the whole CONFIG, packed into a URL-safe base64 blob in
-   the "c" query param, so a link fully reproduces the configuration. */
-function encodeConfig(cfg) {
-  const json = JSON.stringify(cfg);
-  return btoa(unescape(encodeURIComponent(json)))
-    .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-}
-function decodeConfig(str) {
-  try {
-    let b64 = str.replace(/-/g, "+").replace(/_/g, "/");
-    while (b64.length % 4) b64 += "=";
-    return JSON.parse(decodeURIComponent(escape(atob(b64))));
-  } catch (e) { return null; }
-}
-function loadFromURL() {
-  const c = new URLSearchParams(location.search).get("c");
-  if (!c) return;
-  const parsed = decodeConfig(c);
-  if (parsed) Object.assign(CONFIG, parsed);
-}
-function updateURL() {
-  const url = new URL(location.href);
-  url.searchParams.set("c", encodeConfig(CONFIG));
-  history.replaceState(null, "", url);
-}
+/* Share links — see shared.js for the codec itself. This schema is
+   page-specific: it lists CONFIG's fields, their short wire codes, and
+   how to (de)serialize each one. Once a code has shipped, never reassign
+   it to a different field — mint a new code instead; it's safe to add,
+   remove, or reorder entries here freely. */
+const SHARE_SCHEMA = {
+  widthFt:        { code: "wf",  type: "num" },
+  depthFt:        { code: "df",  type: "num" },
+  wallHeightFt:   { code: "wh",  type: "num" },
+  pitch:          { code: "pi",  type: "num" },
+  doorWidths:     { code: "dw",  type: "numArr" },
+  doorHeightFt:   { code: "dh",  type: "num" },
+  doorTrimIn:     { code: "dt",  type: "num" },
+  cornerReturnFt: { code: "cr",  type: "num" },
+  pierFt:         { code: "pf",  type: "num" },
+  curbInches:     { code: "ci",  type: "num" },
+  overhangInches: { code: "oh",  type: "num" },
+  showDormers:    { code: "sd",  type: "bool" },
+  dormerWidths:   { code: "dmw", type: "numArr" },
+  dormerWallFt:   { code: "dwf", type: "num" },
+  showStairs:     { code: "ss",  type: "bool" },
+  stairWidthFt:   { code: "sw",  type: "num" },
+  riserInches:    { code: "ri",  type: "num" },
+  showHouse:      { code: "sh",  type: "bool" },
+  houseGapFt:     { code: "hg",  type: "num" },
+  pxPerFt:        { code: "px",  type: "num" },
+  siding:         { code: "sid", type: "str" },
+  colors:         { code: "col", type: "colors" }
+};
+const COLOR_KEYS = COLOR_ROLES.map(([k]) => k);
+const share = createShareLink(CONFIG, SHARE_SCHEMA, COLOR_KEYS);
 
 function render() {
   // checks
@@ -761,48 +615,76 @@ function render() {
   out.innerHTML = "";
   const sidingName = SIDING_TYPES.find(t => t.id === CONFIG.siding)?.name ?? CONFIG.siding;
   const svg = drawGarage(CONFIG, "s0");
+
   const wrap = document.createElement("div");
   wrap.className = "scheme";
-  wrap.innerHTML =
-    `<div class="shead"><h3>Elevation</h3><span class="mat">${sidingName}</span>` +
-    `<div class="actions">` +
-    `<button type="button" class="save">Save SVG</button>` +
-    `<button type="button" class="share">Copy link</button>` +
-    `</div></div>` +
-    `<div class="art">${svg}</div>`;
-  wrap.querySelector(".save").addEventListener("click", () =>
-    saveSVG(svg, "garage-elevation.svg"));
-  const shareBtn = wrap.querySelector(".share");
-  shareBtn.addEventListener("click", () => {
-    updateURL();
-    navigator.clipboard.writeText(location.href).then(() => {
-      const orig = shareBtn.textContent;
-      shareBtn.textContent = "Copied!";
-      setTimeout(() => { shareBtn.textContent = orig; }, 1200);
-    });
-  });
+
+  const shead = document.createElement("div");
+  shead.className = "shead";
+  shead.innerHTML = `<h3>Elevation</h3><span class="mat">${sidingName}</span>`;
+  shead.appendChild(buildElevationActions({
+    getSvg: () => svg,
+    filenames: { svg: "garage-elevation.svg", png: "garage-elevation.png" },
+    updateURL: share.updateURL
+  }));
+
+  const art = document.createElement("div");
+  art.className = "art";
+  art.innerHTML = svg;
+  attachImageContextMenu(art, { getSvg: () => svg, filename: "garage-elevation.png", updateURL: share.updateURL });
+
+  wrap.appendChild(shead);
+  wrap.appendChild(art);
   out.appendChild(wrap);
 
-  updateURL();
+  share.afterRender();
 }
 
-function initTabs() {
-  const buttons = document.querySelectorAll(".tabbar button");
-  buttons.forEach(btn => btn.addEventListener("click", () => {
-    buttons.forEach(b => b.classList.remove("active"));
-    btn.classList.add("active");
-    document.querySelectorAll(".tabpanel").forEach(p => p.classList.remove("active"));
-    document.getElementById(btn.dataset.tab).classList.add("active");
-  }));
-}
+share.loadFromURL();
 
-loadFromURL();
-buildControls("ctlBuilding", FIELDS_BUILDING);
+insertFieldGroup("ctlBuilding", "Dimensions");
+buildControls("ctlBuilding", FIELDS_BUILDING_DIMENSIONS);
+insertFieldGroup("ctlBuilding", "Roof & foundation");
+buildControls("ctlBuilding", FIELDS_BUILDING_ROOF);
+insertFieldGroup("ctlBuilding", "Site & scale");
+buildControls("ctlBuilding", FIELDS_BUILDING_SITE);
+
+insertFieldGroup("ctlDoors", "Doors");
 buildControls("ctlDoors", FIELDS_DOORS);
 buildDoorHeightSelect();
-buildToggles();
-buildAppearanceControls();
-buildColorControls();
+buildSwapDoorsButton();
+insertFieldGroup("ctlDoors", "Framing");
+buildControls("ctlDoors", FIELDS_FRAMING);
+insertFieldGroup("ctlDoors", "Dormers");
+buildControls("ctlDoors", FIELDS_DORMERS);
+buildSwapDormersButton();
+buildToggle("ctlDoors", "showDormers", "Dormers");
+insertFieldGroup("ctlDoors", "Stairs");
+buildControls("ctlDoors", FIELDS_STAIRS);
+buildToggle("ctlDoors", "showStairs", "Stairs");
+insertFieldGroup("ctlDoors", "Site");
+buildToggle("ctlDoors", "showHouse", "Show house");
+
+buildAppearanceSection({
+  paletteHostId: "ctlAppearance",
+  swatchHostId: "ctlColors",
+  palettes: PALETTES,
+  colorRoles: COLOR_ROLES,
+  config: CONFIG,
+  onChange: render,
+  exportName: "garage-palette.png",
+  getExportExtra: () => ({ Siding: SIDING_TYPES.find(t => t.id === CONFIG.siding)?.name ?? CONFIG.siding }),
+  extra(host) {
+    const sidingLabel = document.createElement("label");
+    sidingLabel.innerHTML = `<span>Siding type</span>`;
+    const sidingSel = document.createElement("select");
+    sidingSel.innerHTML = SIDING_TYPES.map(t => `<option value="${t.id}">${t.name}</option>`).join("");
+    sidingSel.value = CONFIG.siding;
+    sidingSel.addEventListener("change", () => { CONFIG.siding = sidingSel.value; render(); });
+    sidingLabel.appendChild(sidingSel);
+    host.appendChild(sidingLabel);
+  }
+});
 initTabs();
 render();
 </script>

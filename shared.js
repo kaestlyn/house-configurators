@@ -412,16 +412,87 @@ function initTabs() {
    exportName: filename for the "Export palette" button's download.
    getExportExtra(): optional, returns extra fields (e.g. { siding }) to
    include in the exported JSON alongside colors. */
-function buildAppearanceSection({ paletteHostId, swatchHostId, palettes, colorRoles, config, onChange, extra, exportName, getExportExtra }) {
+/* ---------- saved palettes: localStorage, namespaced per tool ----------
+   Cookies would work too but are the wrong tool here — they're capped
+   around 4KB, get sent to a server on every request (irrelevant for a
+   static site), and localStorage is simpler for a per-origin list like
+   this: plenty of room, no expiry, and trivial to enumerate/delete. */
+function savedPaletteKey(namespace) {
+  return `elevationTool:${namespace}:palettes`;
+}
+function loadSavedPalettes(namespace) {
+  try {
+    const raw = localStorage.getItem(savedPaletteKey(namespace));
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) { return []; }
+}
+function writeSavedPalettes(namespace, list) {
+  try { localStorage.setItem(savedPaletteKey(namespace), JSON.stringify(list)); }
+  catch (e) { showToast("Couldn't save — storage may be full or blocked"); }
+}
+
+function buildAppearanceSection({ paletteHostId, swatchHostId, palettes, colorRoles, config, onChange, extra, exportName, getExportExtra, namespace }) {
   const paletteHost = document.getElementById(paletteHostId);
 
   const paletteLabel = document.createElement("label");
   paletteLabel.innerHTML = `<span>Color palette</span>`;
   const paletteSel = document.createElement("select");
-  paletteSel.innerHTML = `<option value="">Custom</option>` +
-    palettes.map((p, i) => `<option value="${i}">${p.name}</option>`).join("");
   paletteLabel.appendChild(paletteSel);
   paletteHost.appendChild(paletteLabel);
+
+  let saved = namespace ? loadSavedPalettes(namespace) : [];
+  let deleteBtn = null;
+  function updateDeleteState() {
+    if (deleteBtn) deleteBtn.disabled = !paletteSel.value.startsWith("s");
+  }
+  function rebuildPaletteOptions() {
+    const presetOpts = palettes.map((p, i) => `<option value="b${i}">${p.name}</option>`).join("");
+    const savedOpts = saved.map((p, i) => `<option value="s${i}">${p.name}</option>`).join("");
+    paletteSel.innerHTML = `<option value="">Custom</option>` +
+      `<optgroup label="Presets">${presetOpts}</optgroup>` +
+      (saved.length ? `<optgroup label="Saved">${savedOpts}</optgroup>` : "");
+    updateDeleteState();
+  }
+  rebuildPaletteOptions();
+
+  if (namespace) {
+    const saveLabel = document.createElement("label");
+    saveLabel.innerHTML = `<span>&nbsp;</span>`;
+    const saveBtn = document.createElement("button");
+    saveBtn.type = "button";
+    saveBtn.textContent = "Save palette…";
+    saveBtn.addEventListener("click", () => {
+      const name = (prompt("Name this palette:") || "").trim();
+      if (!name) return;
+      const entry = { name, c: { ...config.colors } };
+      const existing = saved.findIndex(p => p.name === name);
+      if (existing >= 0) saved[existing] = entry; else saved.push(entry);
+      writeSavedPalettes(namespace, saved);
+      rebuildPaletteOptions();
+      paletteSel.value = "s" + (existing >= 0 ? existing : saved.length - 1);
+      showToast(`Saved "${name}"`);
+    });
+    saveLabel.appendChild(saveBtn);
+    paletteHost.appendChild(saveLabel);
+
+    const deleteLabel = document.createElement("label");
+    deleteLabel.innerHTML = `<span>&nbsp;</span>`;
+    deleteBtn = document.createElement("button");
+    deleteBtn.type = "button";
+    deleteBtn.textContent = "Delete saved";
+    deleteBtn.addEventListener("click", () => {
+      if (!paletteSel.value.startsWith("s")) { showToast("Select a saved palette to delete"); return; }
+      const i = +paletteSel.value.slice(1);
+      const name = saved[i]?.name;
+      saved.splice(i, 1);
+      writeSavedPalettes(namespace, saved);
+      rebuildPaletteOptions();
+      paletteSel.value = "";
+      if (name) showToast(`Deleted "${name}"`);
+    });
+    deleteLabel.appendChild(deleteBtn);
+    paletteHost.appendChild(deleteLabel);
+  }
 
   const exportLabel = document.createElement("label");
   exportLabel.innerHTML = `<span>&nbsp;</span>`;
@@ -481,13 +552,21 @@ function buildAppearanceSection({ paletteHostId, swatchHostId, palettes, colorRo
   // matching a palette exactly re-selects it in the dropdown; editing any
   // swatch afterward falls back to "Custom"
   function syncPaletteSelect() {
-    const idx = palettes.findIndex(p =>
-      colorRoles.every(([key]) => p.c[key] === config.colors[key]));
-    paletteSel.value = idx === -1 ? "" : String(idx);
+    const matches = p => colorRoles.every(([key]) => p.c[key] === config.colors[key]);
+    const bi = palettes.findIndex(matches);
+    if (bi >= 0) { paletteSel.value = "b" + bi; updateDeleteState(); return; }
+    const si = saved.findIndex(matches);
+    paletteSel.value = si >= 0 ? "s" + si : "";
+    updateDeleteState();
   }
   paletteSel.addEventListener("change", () => {
-    if (paletteSel.value === "") return;
-    Object.assign(config.colors, palettes[+paletteSel.value].c);
+    updateDeleteState();
+    const v = paletteSel.value;
+    if (!v) return;
+    const list = v[0] === "b" ? palettes : saved;
+    const entry = list[+v.slice(1)];
+    if (!entry) return;
+    Object.assign(config.colors, entry.c);
     refreshSwatches();
     onChange();
   });

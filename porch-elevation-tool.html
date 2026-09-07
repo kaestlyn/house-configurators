@@ -60,7 +60,7 @@ const CONFIG = {
   postSizeIn:        5.5,   // 6x6 actual
   openingHeightFt:   7,     // deck to underside of header
   railHeightFt:      3.4,   // deck to top of handrail
-  railBotFt:         0.78,  // deck to bottom rail
+  railBotFt:         0.42,  // deck to bottom rail — 0.42 sits it flush with the floor (matches railBotH)
   deckAboveGradeFt:  2.5,   // deck surface above grade
   transomTallFt:     2.3,   // transom height at the house end
   transomShortFt:    1.0,   // transom height at the far end
@@ -511,7 +511,7 @@ const FIELDS_PORCH_OPENINGS = [
 ];
 const FIELDS_PORCH_RAIL_DECK = [
   ["railHeightFt", "Rail height (ft)", 2.5, 4.5, 0.1],
-  ["railBotFt", "Rail bottom, from floor (ft)", 0.3, 2, 0.05],
+  ["railBotFt", "Rail bottom (ft)", 0, 2, 0.05],
   ["deckAboveGradeFt", "Deck above grade (ft)", 0.5, 8, 0.25]
 ];
 const FIELDS_PORCH_SCALE = [
@@ -565,11 +565,14 @@ function buildSelect(hostId, key, label, options) {
 function buildToggle(hostId, key, label) {
   const host = document.getElementById(hostId);
   const l = document.createElement("label");
-  l.className = "check";
+  l.innerHTML = `<span>&nbsp;</span>`;
+  const row = document.createElement("span");
+  row.className = "check-row";
   const inp = document.createElement("input");
   inp.type = "checkbox"; inp.checked = CONFIG[key];
   inp.addEventListener("change", () => { CONFIG[key] = inp.checked; render(); });
-  l.appendChild(inp); l.appendChild(document.createTextNode(label));
+  row.appendChild(inp); row.appendChild(document.createTextNode(label));
+  l.appendChild(row);
   host.appendChild(l);
 }
 
@@ -665,6 +668,7 @@ buildAppearanceSection({
   colorRoles: COLOR_ROLES,
   config: CONFIG,
   onChange: render,
+  namespace: "porch",
   exportName: "porch-palette.png"
 });
 initTabs();

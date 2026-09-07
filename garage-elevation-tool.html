@@ -24,16 +24,41 @@
     margin:0; background:var(--paper); color:var(--ink);
     font-family:var(--sans); font-size:15px; line-height:1.55;
   }
-  .wrap { max-width:1180px; margin:0 auto; padding:32px 24px 80px; }
+  .wrap { max-width:1180px; margin:0 auto; padding:20px 24px 60px; }
+
+  /* ---- nav ---- */
+  nav.tools {
+    display:flex; gap:2px; border-bottom:1px solid var(--line);
+    background:var(--sunk); padding:0 24px;
+  }
+  nav.tools a {
+    font-family:var(--mono); font-size:11.5px; letter-spacing:0.06em; text-transform:uppercase;
+    color:var(--muted); text-decoration:none; padding:13px 14px;
+    border-bottom:2px solid transparent;
+  }
+  nav.tools a:hover { color:var(--ink); }
+  nav.tools a.active { color:var(--accent); border-bottom-color:var(--accent); }
   h1 { font-size:26px; margin:0 0 6px; font-weight:600; letter-spacing:-0.01em; }
   .sub { color:var(--muted); margin:0 0 28px; max-width:62ch; }
   code { font-family:var(--mono); font-size:0.92em; background:var(--sunk); padding:1px 5px; border-radius:3px; }
 
+  /* ---- tabs ---- */
+  .tabbar { display:flex; gap:4px; margin:24px 0 0; border-bottom:1px solid var(--line); }
+  .tabbar button {
+    font-family:var(--mono); font-size:11px; font-weight:500; letter-spacing:0.1em;
+    text-transform:uppercase; padding:10px 14px; margin-bottom:-1px; cursor:pointer;
+    background:none; border:none; border-bottom:2px solid transparent; color:var(--muted);
+  }
+  .tabbar button:hover { color:var(--ink); }
+  .tabbar button.active { color:var(--accent); border-bottom-color:var(--accent); }
+
   /* ---- controls ---- */
   .panel {
-    background:var(--sunk); border:1px solid var(--line);
+    background:var(--sunk); border:1px solid var(--line); border-top:none;
     padding:20px 22px; margin-bottom:14px;
   }
+  .tabpanel { display:none; }
+  .tabpanel.active { display:block; }
   .panel h2 {
     font-family:var(--mono); font-size:11px; font-weight:500; letter-spacing:0.14em;
     text-transform:uppercase; color:var(--accent); margin:0 0 14px;
@@ -56,6 +81,9 @@
     width:100%; height:30px; padding:2px; background:var(--paper);
     border:1px solid var(--line); border-radius:3px; cursor:pointer;
   }
+  .swatch select.copyfrom {
+    font-size:10.5px; padding:3px 4px; margin-top:2px;
+  }
 
   /* ---- checks readout ---- */
   .checks { display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:10px 20px; }
@@ -67,12 +95,13 @@
   .chk .lbl { color:var(--muted); }
 
   /* ---- output ---- */
-  .scheme { margin-top:34px; }
+  #out .scheme { margin-top:0; }
   .shead { display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; margin-bottom:8px; }
   .shead h3 { margin:0; font-size:18px; font-weight:600; }
   .shead .mat { font-family:var(--mono); font-size:11.5px; color:var(--muted); letter-spacing:0.04em; }
+  .shead .actions { margin-left:auto; display:flex; gap:8px; }
   .shead button {
-    margin-left:auto; font-family:var(--mono); font-size:11px; letter-spacing:0.08em;
+    font-family:var(--mono); font-size:11px; letter-spacing:0.08em;
     text-transform:uppercase; padding:5px 11px; cursor:pointer;
     background:var(--paper); color:var(--ink); border:1px solid var(--line); border-radius:3px;
   }
@@ -82,35 +111,41 @@
 </style>
 </head>
 <body>
+<nav class="tools">
+  <a href="garage-elevation-tool.html" class="active">Garage</a>
+  <a href="porch-elevation-tool.html">Porch</a>
+</nav>
 <div class="wrap">
 
-  <h1>Garage elevation tool</h1>
   <!-- Everything is driven by the CONFIG object at the top of the script.
        The drawing is generated SVG; "Save SVG" hands you a file you can
        open in Figma or Inkscape. -->
 
-  <div class="panel">
-    <h2>Building</h2>
+  <div id="out"></div>
+
+  <div class="tabbar">
+    <button type="button" class="active" data-tab="tabBuilding">Building</button>
+    <button type="button" data-tab="tabDoors">Doors &amp; dormers</button>
+    <button type="button" data-tab="tabAppearance">Appearance</button>
+    <button type="button" data-tab="tabChecks">Checks</button>
+  </div>
+
+  <div class="panel tabpanel active" id="tabBuilding">
     <div class="grid" id="ctlBuilding"></div>
   </div>
 
-  <div class="panel">
-    <h2>Doors &amp; dormers</h2>
+  <div class="panel tabpanel" id="tabDoors">
     <div class="grid" id="ctlDoors"></div>
   </div>
 
-  <div class="panel">
-    <h2>Appearance</h2>
+  <div class="panel tabpanel" id="tabAppearance">
     <div class="grid" id="ctlAppearance"></div>
     <div class="swatches" id="ctlColors"></div>
   </div>
 
-  <div class="panel">
-    <h2>Checks</h2>
+  <div class="panel tabpanel" id="tabChecks">
     <div class="checks" id="checks"></div>
   </div>
-
-  <div id="out"></div>
 </div>
 
 <script>
@@ -129,6 +164,7 @@ const CONFIG = {
 
   doorWidths:   [18, 9],  // left to right
   doorHeightFt:   8,
+  doorTrimIn:     4.5,    // casing width around each door
   cornerReturnFt: 2,      // wall at each end of the elevation
   pierFt:         2,      // wall between doors
 
@@ -157,8 +193,10 @@ const CONFIG = {
 /* Siding types the wall pattern can be drawn in. */
 
 const SIDING_TYPES = [
-  { id: "bb",  name: "Board & batten" },
-  { id: "lap", name: "8\" lap" }
+  { id: "bb",    name: "Board & batten" },
+  { id: "lap",   name: "8\" lap" },
+  { id: "panel", name: "Vertical panel (T1-11)" },
+  { id: "shake", name: "Cedar shake" }
 ];
 
 /* Pre-configured color palettes. Any of these can be loaded, then tweaked
@@ -241,6 +279,23 @@ function sidingPattern(id, kind, g) {
       <rect width="${b}" height="600" fill="var(--batten)"/>
       <rect x="${b}" width="1.3" height="600" fill="rgba(0,0,0,0.13)"/></pattern>`;
   }
+  if (kind === "panel") {
+    // wide flat sheet panels (T1-11 style) — a deep groove every 2', no batten
+    const p = g.ft(2);
+    return `<pattern id="${id}" width="${p}" height="600" patternUnits="userSpaceOnUse">
+      <rect width="${p}" height="600" fill="var(--body)"/>
+      <rect x="${p - 3}" width="3" height="600" fill="rgba(0,0,0,0.28)"/>
+      <rect x="${p - 6}" width="1.5" height="600" fill="rgba(0,0,0,0.10)"/></pattern>`;
+  }
+  if (kind === "shake") {
+    // staggered cedar shake courses, alternating tone per tile
+    const tw = g.ft(0.75), th = g.ft(0.6);
+    return `<pattern id="${id}" width="${tw * 2}" height="${th}" patternUnits="userSpaceOnUse">
+      <rect width="${tw * 2}" height="${th}" fill="var(--body)"/>
+      <rect x="1" y="1.5" width="${tw - 2}" height="${th - 7}" fill="var(--batten)"/>
+      <rect x="${tw + 1}" y="1.5" width="${tw - 2}" height="${th - 7}" fill="var(--body)"/>
+      <rect y="${th - 5}" width="${tw * 2}" height="5" fill="rgba(0,0,0,0.22)"/></pattern>`;
+  }
   const h = g.ft(0.67);
   return `<pattern id="${id}" width="600" height="${h}" patternUnits="userSpaceOnUse">
     <rect width="600" height="${h}" fill="var(--body)"/>
@@ -274,9 +329,10 @@ function overheadDoor(a, b, g, cfg) {
     s += rect(a + 7, py + secH - 8, w - 14, 1.2, "rgba(0,0,0,0.10)");
   }
   // casing
-  s += rect(a - 6, top - 6, w + 12, 6, "var(--trim)");
-  s += rect(a - 6, top - 6, 6, g.groundY - top + 6, "var(--trim)");
-  s += rect(b, top - 6, 6, g.groundY - top + 6, "var(--trim)");
+  const trim = g.inch(cfg.doorTrimIn);
+  s += rect(a - trim, top - trim, w + trim * 2, trim, "var(--trim)");
+  s += rect(a - trim, top - trim, trim, g.groundY - top + trim, "var(--trim)");
+  s += rect(b, top - trim, trim, g.groundY - top + trim, "var(--trim)");
   return s;
 }
 
@@ -289,8 +345,14 @@ function dormer(cx, widthFt, g, cfg, uid) {
   const peak = wallT - g.ft(widthFt / 2) * (cfg.pitch / 12);
 
   let s = poly(`${cx - hw - 7},${wallT + 5} ${cx},${peak} ${cx + hw + 7},${wallT + 5}`, "var(--roof)");
-  s += poly(`${cx - hw - 4},${wallT + 9} ${cx},${peak + 5} ${cx + hw + 4},${wallT + 9}`, "var(--trim)");
-  s += rect(cx - hw, wallT, hw * 2, base - wallT, `url(#sd${uid})`);
+  // siding fills the whole gable field, cropped by the roofline itself —
+  // its peak matches the roof's own apex so no sliver of bare roof shows above it
+  s += poly(
+    `${cx - hw},${base} ${cx - hw},${wallT} ${cx},${peak} ${cx + hw},${wallT} ${cx + hw},${base}`,
+    `url(#sd${uid})`);
+  // thin rake trim along the roof edge — a stroke, not a filled triangle,
+  // so it caps the gable without hiding the siding underneath it
+  s += `<polyline points="${cx - hw - 4},${wallT + 9} ${cx},${peak} ${cx + hw + 4},${wallT + 9}" fill="none" stroke="var(--trim)" stroke-width="7" stroke-linejoin="round"/>`;
   s += rect(cx - hw, wallT, 6, base - wallT, "var(--trim)");
   s += rect(cx + hw - 6, wallT, 6, base - wallT, "var(--trim)");
   s += rect(cx - hw, base - 4, hw * 2, 4, "var(--trim)");
@@ -407,7 +469,6 @@ function drawGarage(cfg, uid) {
   s += rect(RL, g.eaveY, RR - RL, 1.8, "rgba(0,0,0,0.22)");
   s += rect(RL, g.wallTopY - 4, RR - RL, 4, "var(--trim)");
   s += rect(g.x0 - 2, g.wallTopY, g.wallW + 4, 4, "rgba(0,0,0,0.15)");
-  s += rect(g.x0 - 8, g.wallTopY, 6, g.groundY - g.wallTopY, "var(--trim)");
 
   // Site colors are pinned on the <svg> itself (not inherited from the page)
   // so a saved .svg still renders correctly on its own.
@@ -494,7 +555,7 @@ const FIELDS_BUILDING = [
 const FIELDS_DOORS = [
   ["door0", "Door 1 (ft)", 6, 24, 1],
   ["door1", "Door 2 (ft)", 0, 24, 1],
-  ["doorHeightFt", "Door height (ft)", 6, 16, 0.5],
+  ["doorTrimIn", "Door trim (in)", 2, 10, 0.5],
   ["cornerReturnFt", "Corner return (ft)", 0.5, 10, 0.5],
   ["pierFt", "Pier between (ft)", 0.5, 10, 0.5],
   ["dormer0", "Dormer 1 (ft)", 0, 20, 1],
@@ -539,6 +600,20 @@ function buildControls(hostId, fields) {
     l.appendChild(inp);
     host.appendChild(l);
   });
+}
+
+function buildDoorHeightSelect() {
+  const host = document.getElementById("ctlDoors");
+  const l = document.createElement("label");
+  l.innerHTML = `<span>Door height (ft)</span>`;
+  const sel = document.createElement("select");
+  sel.innerHTML = `<option value="8">8'</option><option value="9">9'</option>`;
+  // snap to the nearest supported height (handles values loaded from an old share link)
+  CONFIG.doorHeightFt = Math.abs(CONFIG.doorHeightFt - 9) < Math.abs(CONFIG.doorHeightFt - 8) ? 9 : 8;
+  sel.value = String(CONFIG.doorHeightFt);
+  sel.addEventListener("change", () => { CONFIG.doorHeightFt = parseFloat(sel.value); render(); });
+  l.appendChild(sel);
+  host.appendChild(l);
 }
 
 function buildToggles() {
@@ -617,6 +692,23 @@ function buildColorControls() {
       render();
     });
     l.appendChild(inp);
+
+    // "copy from" — pick another role to pull its current color into this one
+    const copy = document.createElement("select");
+    copy.className = "copyfrom";
+    copy.innerHTML = `<option value="">Copy from…</option>` +
+      COLOR_ROLES.filter(([k]) => k !== key)
+        .map(([k, lbl]) => `<option value="${k}">${lbl}</option>`).join("");
+    copy.addEventListener("change", () => {
+      if (!copy.value) return;
+      CONFIG.colors[key] = CONFIG.colors[copy.value];
+      inp.value = CONFIG.colors[key];
+      copy.value = "";
+      if (window._syncPaletteSelect) window._syncPaletteSelect();
+      render();
+    });
+    l.appendChild(copy);
+
     host.appendChild(l);
   });
 }
@@ -628,6 +720,32 @@ function saveSVG(markup, name) {
   a.href = url; a.download = name;
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+/* Share links — the whole CONFIG, packed into a URL-safe base64 blob in
+   the "c" query param, so a link fully reproduces the configuration. */
+function encodeConfig(cfg) {
+  const json = JSON.stringify(cfg);
+  return btoa(unescape(encodeURIComponent(json)))
+    .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+function decodeConfig(str) {
+  try {
+    let b64 = str.replace(/-/g, "+").replace(/_/g, "/");
+    while (b64.length % 4) b64 += "=";
+    return JSON.parse(decodeURIComponent(escape(atob(b64))));
+  } catch (e) { return null; }
+}
+function loadFromURL() {
+  const c = new URLSearchParams(location.search).get("c");
+  if (!c) return;
+  const parsed = decodeConfig(c);
+  if (parsed) Object.assign(CONFIG, parsed);
+}
+function updateURL() {
+  const url = new URL(location.href);
+  url.searchParams.set("c", encodeConfig(CONFIG));
+  history.replaceState(null, "", url);
 }
 
 function render() {
@@ -647,18 +765,45 @@ function render() {
   wrap.className = "scheme";
   wrap.innerHTML =
     `<div class="shead"><h3>Elevation</h3><span class="mat">${sidingName}</span>` +
-    `<button type="button">Save SVG</button></div>` +
+    `<div class="actions">` +
+    `<button type="button" class="save">Save SVG</button>` +
+    `<button type="button" class="share">Copy link</button>` +
+    `</div></div>` +
     `<div class="art">${svg}</div>`;
-  wrap.querySelector("button").addEventListener("click", () =>
+  wrap.querySelector(".save").addEventListener("click", () =>
     saveSVG(svg, "garage-elevation.svg"));
+  const shareBtn = wrap.querySelector(".share");
+  shareBtn.addEventListener("click", () => {
+    updateURL();
+    navigator.clipboard.writeText(location.href).then(() => {
+      const orig = shareBtn.textContent;
+      shareBtn.textContent = "Copied!";
+      setTimeout(() => { shareBtn.textContent = orig; }, 1200);
+    });
+  });
   out.appendChild(wrap);
+
+  updateURL();
 }
 
+function initTabs() {
+  const buttons = document.querySelectorAll(".tabbar button");
+  buttons.forEach(btn => btn.addEventListener("click", () => {
+    buttons.forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    document.querySelectorAll(".tabpanel").forEach(p => p.classList.remove("active"));
+    document.getElementById(btn.dataset.tab).classList.add("active");
+  }));
+}
+
+loadFromURL();
 buildControls("ctlBuilding", FIELDS_BUILDING);
 buildControls("ctlDoors", FIELDS_DOORS);
+buildDoorHeightSelect();
 buildToggles();
 buildAppearanceControls();
 buildColorControls();
+initTabs();
 render();
 </script>
 </body>

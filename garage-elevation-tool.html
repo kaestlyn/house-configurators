@@ -84,7 +84,7 @@ const CONFIG = {
 
   // appearance — siding type and colors are independent of each other
   siding:         "bb",   // "bb" (board & batten) or "lap"
-  colors: { body:"#F0ECE3", batten:"#F5F1E9", trim:"#F0ECE3", door:"#2B2926", glass:"#8FA3AD", roof:"#2B2926", curb:"#5E5852" }
+  colors: { body:"#F0ECE3", batten:"#F5F1E9", trim:"#F0ECE3", door:"#2B2926", glass:"#8FA3AD", roof:"#2B2926", curb:"#5E5852", tread:"#2B2926", riser:"#2B2926" }
 };
 
 /* Siding types the wall pattern can be drawn in. */
@@ -100,10 +100,10 @@ const SIDING_TYPES = [
    freely — the palette and the siding type are chosen independently. */
 
 const PALETTES = [
-  { name: "White",       c: { body:"#F0ECE3", batten:"#F5F1E9", trim:"#F0ECE3", door:"#2B2926", glass:"#8FA3AD", roof:"#2B2926", curb:"#5E5852" } },
-  { name: "Charcoal",    c: { body:"#3B3A37", batten:"#3B3A37", trim:"#F0ECE3", door:"#31302D", glass:"#7E939E", roof:"#2B2926", curb:"#26251F" } },
-  { name: "Warm greige", c: { body:"#A99C8B", batten:"#A99C8B", trim:"#F0ECE3", door:"#2B2926", glass:"#8FA3AD", roof:"#2B2926", curb:"#6B6255" } },
-  { name: "Deep green",  c: { body:"#3D4A3F", batten:"#42503F", trim:"#F0ECE3", door:"#2B2926", glass:"#8FA3AD", roof:"#2B2926", curb:"#2C332B" } }
+  { name: "White",       c: { body:"#F0ECE3", batten:"#F5F1E9", trim:"#F0ECE3", door:"#2B2926", glass:"#8FA3AD", roof:"#2B2926", curb:"#5E5852", tread:"#2B2926", riser:"#2B2926" } },
+  { name: "Charcoal",    c: { body:"#3B3A37", batten:"#3B3A37", trim:"#F0ECE3", door:"#31302D", glass:"#7E939E", roof:"#2B2926", curb:"#26251F", tread:"#31302D", riser:"#31302D" } },
+  { name: "Warm greige", c: { body:"#A99C8B", batten:"#A99C8B", trim:"#F0ECE3", door:"#2B2926", glass:"#8FA3AD", roof:"#2B2926", curb:"#6B6255", tread:"#2B2926", riser:"#2B2926" } },
+  { name: "Deep green",  c: { body:"#3D4A3F", batten:"#42503F", trim:"#F0ECE3", door:"#2B2926", glass:"#8FA3AD", roof:"#2B2926", curb:"#2C332B", tread:"#2B2926", riser:"#2B2926" } }
 ];
 
 const COLOR_ROLES = [
@@ -112,6 +112,8 @@ const COLOR_ROLES = [
   ["trim",   "Trim"],
   ["door",   "Doors"],
   ["glass",  "Glass"],
+  ["tread",  "Stair tread"],
+  ["riser",  "Stair riser"],
   ["roof",   "Roof"],
   ["curb",   "Curb"]
 ];
@@ -280,7 +282,8 @@ function stairs(g, cfg) {
 
   for (let i = 0; i < n; i++) {
     const y = g.groundY - i * stepH;
-    s += rect(cx - w / 2, y - stepH, w, stepH, "var(--door)");
+    s += rect(cx - w / 2, y - stepH, w, stepH, "var(--riser)");
+    s += rect(cx - w / 2, y - stepH, w, Math.min(g.inch(2), stepH), "var(--tread)");
     s += rect(cx - w / 2, y - stepH, w, 2.2, "rgba(255,255,255,0.15)");
     s += rect(cx - w / 2, y - 2.2, w, 2.2, "rgba(0,0,0,0.30)");
   }

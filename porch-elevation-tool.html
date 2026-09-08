@@ -444,13 +444,6 @@ function drawPorch(cfg, uid) {
   s += poly(`${g.x0 - g.ft(0.4)},${rl - RB} ${g.x1 + g.ft(0.4)},${rr - RB} ${g.x1 + g.ft(0.4)},${rr} ${g.x0 - g.ft(0.4)},${rl}`, "#F1EDE5");
   s += poly(`${g.x0 - g.ft(0.4)},${rl - 4} ${g.x1 + g.ft(0.4)},${rr - 4} ${g.x1 + g.ft(0.4)},${rr} ${g.x0 - g.ft(0.4)},${rl}`, "rgba(0,0,0,0.14)");
 
-  // transom dividers, mid-bay (skipped over the door — it has its own frame)
-  g.bays.forEach((b, i) => {
-    if (i === doorIdx) return;
-    const x = (b[0] + b[1]) / 2 - g.inch(2);
-    s += rect(x, g.rakeY(x), g.inch(4), g.headerTopY - g.rakeY(x), "var(--beam)");
-  });
-
   // header beam
   s += rect(g.x0, g.headerTopY, g.x1 - g.x0, g.headerH, "var(--beam)");
   s += rect(g.x0, g.headerBotY - 3, g.x1 - g.x0, 3, "rgba(0,0,0,0.17)");

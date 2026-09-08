@@ -301,8 +301,14 @@ function balusters(a, b, top, bottom, g, colorVar = "--spindle") {
 function frameOutside(x, y, w, h, t, color, edges) {
   const top = !edges || edges.top !== false, bottom = !edges || edges.bottom !== false;
   const left = !edges || edges.left !== false, right = !edges || edges.right !== false;
-  return (top ? rect(x - t, y - t, w + 2 * t, t, color) : "") +
-         (bottom ? rect(x - t, y + h, w + 2 * t, t, color) : "") +
+  // caps normally overhang by t on each side, but at a shared post that
+  // isn't enough to reach the far side (avoiding a gap in the middle of
+  // the post) — capLeftExt/capRightExt let the caller reach all the way
+  // across it instead
+  const capL = edges && edges.capLeftExt !== undefined ? edges.capLeftExt : t;
+  const capR = edges && edges.capRightExt !== undefined ? edges.capRightExt : t;
+  return (top ? rect(x - capL, y - t, w + capL + capR, t, color) : "") +
+         (bottom ? rect(x - capL, y + h, w + capL + capR, t, color) : "") +
          (left ? rect(x - t, y, t, h, color) : "") +
          (right ? rect(x + w, y, t, h, color) : "");
 }
@@ -319,9 +325,11 @@ function frameInside(x, y, w, h, t, color, edges) {
    its verticals to meet that line at the right height on each side. */
 function slopedFrameOutside(a, c, topFn, bottomY, t, color, edges) {
   const left = !edges || edges.left !== false, right = !edges || edges.right !== false;
+  const capL = edges && edges.capLeftExt !== undefined ? edges.capLeftExt : t;
+  const capR = edges && edges.capRightExt !== undefined ? edges.capRightExt : t;
   const topL = topFn(a), topR = topFn(c);
-  return poly(`${a - t},${topL - t} ${c + t},${topR - t} ${c + t},${topR} ${a - t},${topL}`, color) +
-         rect(a - t, bottomY, (c - a) + 2 * t, t, color) +
+  return poly(`${a - capL},${topL - t} ${c + capR},${topR - t} ${c + capR},${topR} ${a - capL},${topL}`, color) +
+         rect(a - capL, bottomY, (c - a) + capL + capR, t, color) +
          (left ? rect(a - t, topL, t, (bottomY - topL) + t, color) : "") +
          (right ? rect(c, topR, t, (bottomY - topR) + t, color) : "");
 }
@@ -377,9 +385,16 @@ function drawScreens(cfg, g, doorIdx) {
     if (!isScreenable(i)) return;
     const a = b[0], c = b[1], w = c - a;
     // a shared post between two screened bays gets one vertical piece
-    // (below), not one from each side, so surface skips its own here
+    // (below), not one from each side, so surface skips its own here —
+    // and its caps reach all the way across the post (capLeftExt/
+    // capRightExt) instead of just overhanging by t, so they meet the
+    // neighbor's cap with no gap in between
     const edges = surface
-      ? { left: !isScreenable(i - 1), right: !isScreenable(i + 1) }
+      ? {
+          left: !isScreenable(i - 1), right: !isScreenable(i + 1),
+          capLeftExt: isScreenable(i - 1) ? g.PW : t,
+          capRightExt: isScreenable(i + 1) ? g.PW : t
+        }
       : undefined;
 
     if (split === "single") {
@@ -396,7 +411,7 @@ function drawScreens(cfg, g, doorIdx) {
       // width, since that's the actual hardware crossing the rail
       s += flatFrame(a, g.headerBotY, w, g.deckTopY - g.headerBotY, t, color, edges);
       if (surface && split === "all") {
-        s += rect(a - t, g.railTopCapY, w + 2 * t, g.inch(1.5), color);
+        s += rect(a - edges.capLeftExt, g.railTopCapY, w + edges.capLeftExt + edges.capRightExt, g.inch(1.5), color);
       }
     } else {
       // inset (Mini Track) is genuinely two independent pieces of track —

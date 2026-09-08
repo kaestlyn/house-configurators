@@ -6,9 +6,12 @@
 <title>Porch Elevation Tool</title>
 <link rel="stylesheet" href="shared.css">
 <style>
+  .screen-swatches { display:flex; gap:20px; margin-top:16px; }
+  .screen-swatch-wrap { display:flex; flex-direction:column; align-items:center; gap:6px; }
   .screen-swatch { width:36px; height:36px; border-radius:50%; border:2px solid rgba(0,0,0,0.2);
     cursor:pointer; padding:0; }
   .screen-swatch.selected { outline:2px solid var(--accent, #4a90d9); outline-offset:2px; }
+  .screen-swatch-name { font-size:11.5px; color:var(--muted); }
 </style>
 </head>
 <body>
@@ -43,7 +46,7 @@
 
   <div class="panel tabpanel" id="tabScreens">
     <div class="grid" id="ctlScreens"></div>
-    <div class="swatches" id="ctlScreenColors"></div>
+    <div class="screen-swatches" id="ctlScreenColors"></div>
   </div>
 
   <div class="panel tabpanel" id="tabAppearance">
@@ -299,24 +302,32 @@ function frameInside(x, y, w, h, t, color) {
          rect(x + w - t, y, t, h, color);
 }
 
-/* screen molding over the non-door bays. Surface mount is one continuous
-   frame around the whole opening; inset (their "Mini Track") is trimmed
-   to each part of the bay separately, since the handrail interrupts it. */
+/* screen molding over the non-door bays, covering both the transom above
+   the header and the main opening below it. Surface mount is one
+   continuous frame per opening, unbroken by the handrail; inset (their
+   "Mini Track") is trimmed to each part separately, split above and
+   below the handrail itself (the rail's own thickness isn't screened). */
 function drawScreens(cfg, g, doorIdx) {
   if (!cfg.screensOn) return "";
   let s = "";
   const color = cfg.screenColor;
+  const surface = cfg.screenMount === "surface";
+  const frame = surface ? frameOutside : frameInside;
+  const t = surface ? g.inch(cfg.screenWidth === "wide" ? 3.5 : 1.5) : g.inch(0.75);
+
   g.bays.forEach((b, i) => {
     if (i === doorIdx) return;
-    const a = b[0], c = b[1];
-    if (cfg.screenMount === "surface") {
-      const t = g.inch(cfg.screenWidth === "wide" ? 3.5 : 1.5);
-      s += frameOutside(a, g.headerBotY, c - a, g.railBotSubY - g.headerBotY, t, color);
+    const a = b[0], c = b[1], w = c - a;
+    const transomTopY = g.rakeY((a + c) / 2);
+
+    s += frame(a, transomTopY, w, g.headerTopY - transomTopY, t, color);
+
+    if (surface) {
+      s += frame(a, g.headerBotY, w, g.deckTopY - g.headerBotY, t, color);
     } else {
-      const t = g.inch(0.75);
-      const uy1 = g.railTopSubY + g.railTopSubH;
-      s += frameInside(a, g.headerBotY, c - a, uy1 - g.headerBotY, t, color);
-      s += frameInside(a, g.railBotBaseBotY, c - a, g.deckTopY - g.railBotBaseBotY, t, color);
+      s += frame(a, g.headerBotY, w, g.railTopCapY - g.headerBotY, t, color);
+      const belowRailY = g.railTopSubY + g.railTopSubH;
+      s += frame(a, belowRailY, w, g.deckTopY - belowRailY, t, color);
     }
   });
   return s;
@@ -580,18 +591,18 @@ function runChecks(cfg) {
 
 const FIELDS_PORCH_LAYOUT = [
   ["bays", "Bays drawn", 1, 12, 1],
-  ["bayWidthFt", "Bay width, avg (ft)", 2, 12, 0.1],
+  ["bayWidthFt", "Bay width, avg (in)", 24, 144, 1],
   ["postSizeIn", "Post size (in)", 3, 12, 0.5]
 ];
 const FIELDS_PORCH_OPENINGS = [
-  ["openingHeightFt", "Opening height (ft)", 4, 12, 0.1],
+  ["openingHeightFt", "Opening height (in)", 48, 144, 1],
   ["transomTallIn", "Transom, house end (in)", 0, 72, 0.5],
   ["transomShortIn", "Transom, far end (in)", 0, 72, 0.5]
 ];
 const FIELDS_PORCH_RAIL_DECK = [
-  ["railHeightFt", "Rail height (ft)", 2.5, 4.5, 0.1],
-  ["railBotFt", "Rail bottom (ft, 0 = floor)", 0, 2, 0.05],
-  ["deckAboveGradeFt", "Deck above grade (ft)", 0.5, 8, 0.25]
+  ["railHeightFt", "Rail height (in)", 30, 54, 1],
+  ["railBotFt", "Rail bottom (in, 0 = floor)", 0, 24, 1],
+  ["deckAboveGradeFt", "Deck above grade (in)", 6, 96, 1]
 ];
 const FIELDS_PORCH_SCALE = [
   ["pxPerFt", "Scale (px/ft)", 10, 60, 1]
@@ -599,12 +610,21 @@ const FIELDS_PORCH_SCALE = [
 
 const FIELDS_DOOR = [
   ["doorBay", "Door in bay #", 1, 12, 1],
-  ["doorWidthFt", "Door width (ft)", 2, 6, 0.5]
+  ["doorWidthFt", "Door width (in)", 24, 72, 1]
 ];
 const FIELDS_LANDING = [
   ["stairPct", "Stairs (% of landing)", 20, 100, 5],
   ["riserInches", "Riser (in)", 4, 8, 0.25]
 ];
+
+/* Fields stored in CONFIG as feet but shown/edited in inches (the tool's
+   measurements are all specified in inches on site); everything else in
+   these lists is already inches, a count, or a percent. */
+const FEET_STORED_FIELDS = new Set([
+  "bayWidthFt", "openingHeightFt", "railHeightFt", "railBotFt",
+  "deckAboveGradeFt", "doorWidthFt"
+]);
+const NO_UNIT_FIELDS = new Set(["bays", "doorBay", "stairPct", "pxPerFt"]);
 
 function buildNumbers(hostId, fields) {
   const host = document.getElementById(hostId);
@@ -613,11 +633,31 @@ function buildNumbers(hostId, fields) {
     l.innerHTML = `<span>${label}</span>`;
     const inp = document.createElement("input");
     inp.type = "number"; inp.min = min; inp.max = max; inp.step = step;
-    inp.value = CONFIG[key];
-    inp.addEventListener("input", () => {
-      const v = parseFloat(inp.value);
-      if (!Number.isNaN(v)) { CONFIG[key] = v; render(); }
-    });
+
+    if (NO_UNIT_FIELDS.has(key)) {
+      inp.value = CONFIG[key];
+      inp.addEventListener("input", () => {
+        const v = parseFloat(inp.value);
+        if (!Number.isNaN(v)) { CONFIG[key] = v; render(); }
+      });
+    } else {
+      const storedInFeet = FEET_STORED_FIELDS.has(key);
+      const toIn = () => storedInFeet ? CONFIG[key] * 12 : CONFIG[key];
+      const updateTitle = () => {
+        const ft = storedInFeet ? CONFIG[key] : CONFIG[key] / 12;
+        inp.title = `${ft.toFixed(2)}'`;
+      };
+      inp.value = Math.round(toIn() * 100) / 100;
+      updateTitle();
+      inp.addEventListener("input", () => {
+        const v = parseFloat(inp.value);
+        if (!Number.isNaN(v)) {
+          CONFIG[key] = storedInFeet ? v / 12 : v;
+          updateTitle();
+          render();
+        }
+      });
+    }
     l.appendChild(inp); host.appendChild(l);
   });
 }
@@ -646,6 +686,9 @@ function buildSwatches(hostId, key, options) {
   const host = document.getElementById(hostId);
   const buttons = [];
   options.forEach(([hex, name]) => {
+    const wrap = document.createElement("div");
+    wrap.className = "screen-swatch-wrap";
+
     const b = document.createElement("button");
     b.type = "button";
     b.className = "screen-swatch";
@@ -659,7 +702,14 @@ function buildSwatches(hostId, key, options) {
       render();
     });
     buttons.push(b);
-    host.appendChild(b);
+
+    const nameEl = document.createElement("span");
+    nameEl.className = "screen-swatch-name";
+    nameEl.textContent = name;
+
+    wrap.appendChild(b);
+    wrap.appendChild(nameEl);
+    host.appendChild(wrap);
   });
 }
 
@@ -768,7 +818,7 @@ buildSelect("ctlDoor", "stairAlign", "Stair alignment",
   [["center", "Center"], ["left", "Left"], ["right", "Right"]]);
 
 insertFieldGroup("ctlScreens", "Screens");
-buildToggle("ctlScreens", "screensOn", "Screens on (non-door bays)");
+buildToggle("ctlScreens", "screensOn", "New Screens");
 buildSelect("ctlScreens", "screenMount", "Mount type",
   [["surface", "Surface mounted"], ["inset", "Inset (Mini Track)"]]);
 buildSelect("ctlScreens", "screenWidth", "Molding width",
@@ -777,8 +827,8 @@ insertFieldGroup("ctlScreens", "Molding color");
 buildSwatches("ctlScreenColors", "screenColor", SCREEN_COLORS);
 
 function updateScreenFieldVisibility() {
-  const widthRow = document.querySelector('#ctlScreens label[data-key="screenWidth"]');
-  if (widthRow) widthRow.hidden = CONFIG.screenMount !== "surface";
+  const widthSel = document.querySelector('#ctlScreens label[data-key="screenWidth"] select');
+  if (widthSel) widthSel.disabled = CONFIG.screenMount !== "surface";
 }
 
 buildAppearanceSection({

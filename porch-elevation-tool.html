@@ -99,7 +99,8 @@ const CONFIG = {
 
   // appearance — a starting palette, freely editable below
   colors: { post:"#8B5A2E", beam:"#8B5A2E", rail:"#8B5A2E", spindle:"#7E5029",
-            floor:"#6F4522", riser:"#6F4522", skirt:"#8B5A2E", skirtbg:"#3A2A1B", interior:"#2F2C28" }
+            floor:"#6F4522", riser:"#6F4522", skirt:"#8B5A2E", skirtbg:"#3A2A1B", interior:"#2F2C28",
+            door:"#FFFFFF", stairRail:"#8B5A2E", stairSpindle:"#7E5029" }
 };
 
 /* Pre-configured color palettes. Any of these can be loaded, then tweaked
@@ -108,16 +109,20 @@ const CONFIG = {
 const PALETTES = [
   { name:"As it stands", c:{
       post:"#8B5A2E", beam:"#8B5A2E", rail:"#8B5A2E", spindle:"#7E5029",
-      floor:"#6F4522", riser:"#6F4522", skirt:"#8B5A2E", skirtbg:"#3A2A1B", interior:"#2F2C28" } },
+      floor:"#6F4522", riser:"#6F4522", skirt:"#8B5A2E", skirtbg:"#3A2A1B", interior:"#2F2C28",
+      door:"#FFFFFF", stairRail:"#8B5A2E", stairSpindle:"#7E5029" } },
   { name:"Trim white, dark floor", c:{
       post:"#EFEBE2", beam:"#EFEBE2", rail:"#EFEBE2", spindle:"#EFEBE2",
-      floor:"#3B3430", riser:"#3B3430", skirt:"#EFEBE2", skirtbg:"#2A2522", interior:"#2E2C29" } },
+      floor:"#3B3430", riser:"#3B3430", skirt:"#EFEBE2", skirtbg:"#2A2522", interior:"#2E2C29",
+      door:"#FFFFFF", stairRail:"#EFEBE2", stairSpindle:"#EFEBE2" } },
   { name:"Charcoal throughout", c:{
       post:"#343230", beam:"#343230", rail:"#343230", spindle:"#2C2A28",
-      floor:"#2A2724", riser:"#2A2724", skirt:"#343230", skirtbg:"#1E1C1A", interior:"#242220" } },
+      floor:"#2A2724", riser:"#2A2724", skirt:"#343230", skirtbg:"#1E1C1A", interior:"#242220",
+      door:"#FFFFFF", stairRail:"#343230", stairSpindle:"#2C2A28" } },
   { name:"White frame, black rail", c:{
       post:"#EFEBE2", beam:"#EFEBE2", rail:"#EFEBE2", spindle:"#2C2A27",
-      floor:"#3B3430", riser:"#3B3430", skirt:"#EFEBE2", skirtbg:"#2A2522", interior:"#2E2C29" } }
+      floor:"#3B3430", riser:"#3B3430", skirt:"#EFEBE2", skirtbg:"#2A2522", interior:"#2E2C29",
+      door:"#FFFFFF", stairRail:"#EFEBE2", stairSpindle:"#2C2A27" } }
 ];
 
 const SCREEN_COLORS = [
@@ -129,13 +134,16 @@ const SCREEN_COLORS = [
 const COLOR_ROLES = [
   ["post",     "Posts"],
   ["beam",     "Beam / header"],
-  ["rail",     "Rail"],
-  ["spindle",  "Spindles"],
+  ["rail",     "Deck rail"],
+  ["spindle",  "Deck spindles"],
   ["floor",    "Tread (horizontal)"],
   ["riser",    "Riser (vertical)"],
   ["skirt",    "Skirt trim"],
   ["skirtbg",  "Skirt background"],
-  ["interior", "Interior (screen)"]
+  ["interior", "Interior (screen)"],
+  ["door",     "Door"],
+  ["stairRail",    "Stair rail"],
+  ["stairSpindle", "Stair spindles"]
 ];
 
 /* Bay widths in feet: normally uniform, but the door bay is pinned to
@@ -275,7 +283,7 @@ const poly = (pts, f) => `<polygon points="${pts}" fill="${f}"/>`;
 /* balusters filling a run, spaced evenly so the gap at each end matches
    the gaps between balusters (rather than running a fixed gap from the
    left edge and leaving a leftover remainder on the right). */
-function balusters(a, b, top, bottom, g) {
+function balusters(a, b, top, bottom, g, colorVar = "--spindle") {
   const bw = g.inch(1.6), targetGap = g.inch(3.9);
   const w = b - a;
   const n = Math.max(1, Math.round((w - targetGap) / (bw + targetGap)));
@@ -283,22 +291,24 @@ function balusters(a, b, top, bottom, g) {
   let s = "";
   for (let i = 0; i < n; i++) {
     const x = a + gap + i * (bw + gap);
-    s += rect(x, top, bw, bottom - top, "var(--spindle)");
+    s += rect(x, top, bw, bottom - top, `var(${colorVar})`);
   }
   return s;
 }
 
 /* Screen Tight-style molding border, drawn either proud of an opening
    ("surface", outside the given rect) or trimmed just inside it ("inset"). */
-function frameOutside(x, y, w, h, t, color) {
-  return rect(x - t, y - t, w + 2 * t, t, color) +
-         rect(x - t, y + h, w + 2 * t, t, color) +
+function frameOutside(x, y, w, h, t, color, edges) {
+  const top = !edges || edges.top !== false, bottom = !edges || edges.bottom !== false;
+  return (top ? rect(x - t, y - t, w + 2 * t, t, color) : "") +
+         (bottom ? rect(x - t, y + h, w + 2 * t, t, color) : "") +
          rect(x - t, y, t, h, color) +
          rect(x + w, y, t, h, color);
 }
-function frameInside(x, y, w, h, t, color) {
-  return rect(x, y, w, t, color) +
-         rect(x, y + h - t, w, t, color) +
+function frameInside(x, y, w, h, t, color, edges) {
+  const top = !edges || edges.top !== false, bottom = !edges || edges.bottom !== false;
+  return (top ? rect(x, y, w, t, color) : "") +
+         (bottom ? rect(x, y + h - t, w, t, color) : "") +
          rect(x, y, t, h, color) +
          rect(x + w - t, y, t, h, color);
 }
@@ -354,9 +364,16 @@ function drawScreens(cfg, g, doorIdx) {
     if (split === "transom") {
       s += flatFrame(a, g.headerBotY, w, g.deckTopY - g.headerBotY, t, color);
     } else {
-      s += flatFrame(a, g.headerBotY, w, g.railTopCapY - g.headerBotY, t, color);
-      const belowRailY = g.railTopSubY + g.railTopSubH;
-      s += flatFrame(a, belowRailY, w, g.deckTopY - belowRailY, t, color);
+      // the split sits at the bottom of the handrail's cap board — not the
+      // sub-rail below it that the balusters mortise into — since that's
+      // what the track actually mounts to; the two frames share a single
+      // spline piece spanning just the cap board's own thickness
+      const railBot = g.railTopSubY;
+      s += flatFrame(a, g.headerBotY, w, g.railTopCapY - g.headerBotY, t, color, { bottom: false });
+      s += flatFrame(a, railBot, w, g.deckTopY - railBot, t, color, { top: false });
+      s += surface
+        ? rect(a - t, g.railTopCapY, w + 2 * t, railBot - g.railTopCapY, color)
+        : rect(a, g.railTopCapY, w, railBot - g.railTopCapY, color);
     }
   });
   return s;
@@ -371,12 +388,12 @@ function screenDoor(bay, g, cfg) {
   let s = rect(a, top, w, h, "var(--interior)");
   s += rect(a, top, w, h, "rgba(140,150,145,0.10)");
 
-  s += rect(a, top, st, h, "var(--rail)");
-  s += rect(a + w - st, top, st, h, "var(--rail)");
-  s += rect(a, top, w, st, "var(--rail)");
-  s += rect(a, g.deckTopY - st, w, st, "var(--rail)");
-  s += rect(a, g.deckTopY - kick - st, w, st, "var(--rail)");
-  s += rect(a + st, g.deckTopY - kick, w - st * 2, kick - st, "var(--rail)");
+  s += rect(a, top, st, h, "var(--door)");
+  s += rect(a + w - st, top, st, h, "var(--door)");
+  s += rect(a, top, w, st, "var(--door)");
+  s += rect(a, g.deckTopY - st, w, st, "var(--door)");
+  s += rect(a, g.deckTopY - kick - st, w, st, "var(--door)");
+  s += rect(a + st, g.deckTopY - kick, w - st * 2, kick - st, "var(--door)");
   s += rect(a + st, g.deckTopY - kick, w - st * 2, 2, "rgba(0,0,0,0.20)");
 
   // hinge side and handle follow the swing
@@ -422,16 +439,16 @@ function landingSteps(L, g, cfg) {
   [[L.la, L.sa], [L.sb, L.lb]].forEach(seg => {
     const w = seg[1] - seg[0];
     if (w < g.inch(4)) return;
-    s += rect(seg[0], LT - RH, w, g.inch(2.6), "var(--rail)");
-    s += rect(seg[0], LT - g.ft(0.5), w, g.inch(2.2), "var(--rail)");
-    s += balusters(seg[0], seg[1], LT - RH + g.inch(2.6), LT - g.ft(0.5), g);
+    s += rect(seg[0], LT - RH, w, g.inch(2.6), "var(--stairRail)");
+    s += rect(seg[0], LT - g.ft(0.5), w, g.inch(2.2), "var(--stairRail)");
+    s += balusters(seg[0], seg[1], LT - RH + g.inch(2.6), LT - g.ft(0.5), g, "--stairSpindle");
   });
 
   // newels at the landing corners and either side of the steps
   [L.la, L.lb, L.sa, L.sb].forEach(x => {
     const nw = g.inch(4.5);
-    s += rect(x - nw / 2, LT - RH - g.inch(2), nw, RH + g.inch(2), "var(--rail)");
-    s += rect(x - nw / 2 - 3, LT - RH - g.inch(5), nw + 6, g.inch(3.4), "var(--rail)");
+    s += rect(x - nw / 2, LT - RH - g.inch(2), nw, RH + g.inch(2), "var(--stairRail)");
+    s += rect(x - nw / 2 - 3, LT - RH - g.inch(5), nw + 6, g.inch(3.4), "var(--stairRail)");
   });
 
   // stair guards running down beside the steps
@@ -440,16 +457,16 @@ function landingSteps(L, g, cfg) {
     const cxS = (L.sa + L.sb) / 2;
     const xBot = cxS + k * ((L.stairW + grow) / 2);
     const bw = g.inch(3.6);
-    s += rect(xBot - bw / 2, g.groundY - RH, bw, RH, "var(--rail)");
+    s += rect(xBot - bw / 2, g.groundY - RH, bw, RH, "var(--stairRail)");
     s += poly(
       `${xTop + k * bw / 2},${LT - RH} ${xBot + k * bw / 2},${g.groundY - RH} ` +
       `${xBot - k * bw / 2},${g.groundY - RH + g.inch(2.8)} ${xTop - k * bw / 2},${LT - RH + g.inch(2.8)}`,
-      "var(--rail)");
+      "var(--stairRail)");
     for (let t = 0.3; t < 0.95; t += 0.32) {
       const bx = xTop + (xBot - xTop) * t;
       const byT = (LT - RH) + ((g.groundY - RH) - (LT - RH)) * t;
       const byB = (LT + LF) + (g.groundY - (LT + LF)) * t;
-      s += rect(bx - g.inch(0.9), byT + g.inch(2.8), g.inch(1.8), byB - byT - g.inch(2.8), "var(--spindle)");
+      s += rect(bx - g.inch(0.9), byT + g.inch(2.8), g.inch(1.8), byB - byT - g.inch(2.8), "var(--stairSpindle)");
     }
   });
 
@@ -542,11 +559,15 @@ function drawPorch(cfg, uid) {
   s += rect(g.x0, g.deckTopY, g.x1 - g.x0, g.deckFasciaH, "var(--floor)");
   s += rect(g.x0, g.deckTopY, g.x1 - g.x0, 3, "rgba(255,255,255,0.16)");
 
-  // skirt: diamond lattice panel per bay, framed
+  // skirt: one diamond lattice panel spanning the whole run (split only
+  // where the door interrupts it), flush to the frame with no per-bay gaps
   s += rect(g.x0, g.skirtTopY, g.x1 - g.x0, g.groundY - g.skirtTopY, "var(--skirtbg)");
-  g.bays.forEach((b, i) => {
-    if (i === doorIdx) return;
-    const a = b[0] + 6, c = b[1] - 6, t = g.skirtTopY + 6, u = g.groundY - 6;
+  const skirtRuns = doorIdx < 0
+    ? [[g.x0, g.x1]]
+    : [[g.x0, g.bays[doorIdx][0]], [g.bays[doorIdx][1], g.x1]];
+  skirtRuns.forEach(([a, c]) => {
+    if (c - a <= 0) return;
+    const t = g.skirtTopY, u = g.groundY;
     s += rect(a, t, c - a, u - t, `url(#lat${uid})`);
     s += rect(a, t, c - a, g.inch(2), "var(--skirt)");
     s += rect(a, u - g.inch(2), c - a, g.inch(2), "var(--skirt)");

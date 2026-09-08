@@ -350,7 +350,7 @@ function sharedPostVertical(cfg, g, xCenter, t, color) {
   } else {
     const railBot = g.railTopSubY + g.railTopSubH;
     s += rect(x0, g.headerBotY, t, g.railTopCapY - g.headerBotY, color);
-    s += rect(x0, g.railTopCapY, t, t, color);
+    s += rect(x0, g.railTopCapY, t, g.inch(1.5), color);
     s += rect(x0, railBot, t, g.deckTopY - railBot, color);
   }
   return s;
@@ -398,16 +398,23 @@ function drawScreens(cfg, g, doorIdx) {
       // the below-rail piece has to clear the whole handrail (both the
       // cap and the sub-rail the balusters mortise into), not stop partway
       // through it — otherwise it visually overlaps the rail instead of
-      // sitting below it. Above has no cap of its own (the mounting piece
-      // below stands in for it); below keeps its own top cap, so there
-      // are three lines total: the shared mounting piece, below's own
-      // top, and the floor — with the bare handrail visible between them
+      // sitting below it.
       const railBot = g.railTopSubY + g.railTopSubH;
-      s += flatFrame(a, g.headerBotY, w, g.railTopCapY - g.headerBotY, t, color, { ...edges, bottom: false });
-      s += flatFrame(a, railBot, w, g.deckTopY - railBot, t, color, edges);
-      s += surface
-        ? rect(a - t, g.railTopCapY, w + 2 * t, t, color)
-        : rect(a, g.railTopCapY, w, t, color);
+      if (surface) {
+        // surface track is a single piece mounted across the rail, shared
+        // by both frames — always at 1.5" regardless of the chosen
+        // perimeter width, since that's the actual hardware, not a style
+        // choice
+        const capT = g.inch(1.5);
+        s += flatFrame(a, g.headerBotY, w, g.railTopCapY - g.headerBotY, t, color, { ...edges, bottom: false });
+        s += flatFrame(a, railBot, w, g.deckTopY - railBot, t, color, { ...edges, top: false });
+        s += rect(a - t, g.railTopCapY, w + 2 * t, capT, color);
+      } else {
+        // inset track is two independent pieces (Mini Track's own top and
+        // bottom track), each a complete frame — no shared piece
+        s += flatFrame(a, g.headerBotY, w, g.railTopCapY - g.headerBotY, t, color, edges);
+        s += flatFrame(a, railBot, w, g.deckTopY - railBot, t, color, edges);
+      }
     }
   });
 

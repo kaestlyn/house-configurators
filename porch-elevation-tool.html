@@ -300,10 +300,11 @@ function balusters(a, b, top, bottom, g, colorVar = "--spindle") {
    ("surface", outside the given rect) or trimmed just inside it ("inset"). */
 function frameOutside(x, y, w, h, t, color, edges) {
   const top = !edges || edges.top !== false, bottom = !edges || edges.bottom !== false;
+  const left = !edges || edges.left !== false, right = !edges || edges.right !== false;
   return (top ? rect(x - t, y - t, w + 2 * t, t, color) : "") +
          (bottom ? rect(x - t, y + h, w + 2 * t, t, color) : "") +
-         rect(x - t, y, t, h, color) +
-         rect(x + w, y, t, h, color);
+         (left ? rect(x - t, y, t, h, color) : "") +
+         (right ? rect(x + w, y, t, h, color) : "");
 }
 function frameInside(x, y, w, h, t, color, edges) {
   const top = !edges || edges.top !== false, bottom = !edges || edges.bottom !== false;
@@ -316,12 +317,13 @@ function frameInside(x, y, w, h, t, color, edges) {
 /* Same idea, but the top edge follows a sloped line (topFn(x)) instead of
    a flat y — used where the frame has to follow the roof rake, and needs
    its verticals to meet that line at the right height on each side. */
-function slopedFrameOutside(a, c, topFn, bottomY, t, color) {
+function slopedFrameOutside(a, c, topFn, bottomY, t, color, edges) {
+  const left = !edges || edges.left !== false, right = !edges || edges.right !== false;
   const topL = topFn(a), topR = topFn(c);
   return poly(`${a - t},${topL - t} ${c + t},${topR - t} ${c + t},${topR} ${a - t},${topL}`, color) +
          rect(a - t, bottomY, (c - a) + 2 * t, t, color) +
-         rect(a - t, topL, t, (bottomY - topL) + t, color) +
-         rect(c, topR, t, (bottomY - topR) + t, color);
+         (left ? rect(a - t, topL, t, (bottomY - topL) + t, color) : "") +
+         (right ? rect(c, topR, t, (bottomY - topR) + t, color) : "");
 }
 function slopedFrameInside(a, c, topFn, bottomY, t, color) {
   const topL = topFn(a), topR = topFn(c);
@@ -329,6 +331,29 @@ function slopedFrameInside(a, c, topFn, bottomY, t, color) {
          rect(a, bottomY - t, c - a, t, color) +
          rect(a, topL, t, bottomY - topL, color) +
          rect(c - t, topR, t, bottomY - topR, color);
+}
+
+/* One continuous vertical strip at a shared post between two screened
+   bays — surface mount only, since surface trim runs proud of the post
+   and a wide board should span it as one piece rather than each bay
+   mounting its own overlapping half. Segmented the same way the bays'
+   own edges are, so it still breaks at the header and handrail. */
+function sharedPostVertical(cfg, g, xCenter, t, color) {
+  const split = cfg.screenSplit;
+  const x0 = xCenter - t / 2;
+  const rakeTop = g.rakeY(xCenter);
+  if (split === "single") return rect(x0, rakeTop, t, g.deckTopY - rakeTop, color);
+
+  let s = rect(x0, rakeTop, t, g.headerTopY - rakeTop, color);
+  if (split === "transom") {
+    s += rect(x0, g.headerBotY, t, g.deckTopY - g.headerBotY, color);
+  } else {
+    const railBot = g.railTopSubY;
+    s += rect(x0, g.headerBotY, t, g.railTopCapY - g.headerBotY, color);
+    s += rect(x0, g.railTopCapY, t, railBot - g.railTopCapY, color);
+    s += rect(x0, railBot, t, g.deckTopY - railBot, color);
+  }
+  return s;
 }
 
 /* screen molding over the non-door bays. screenSplit controls how many
@@ -349,33 +374,49 @@ function drawScreens(cfg, g, doorIdx) {
   const slopeFrame = surface ? slopedFrameOutside : slopedFrameInside;
   const t = surface ? g.inch(cfg.screenWidth === "wide" ? 3.5 : 1.5) : g.inch(0.75);
   const split = cfg.screenSplit;
+  const isScreenable = i => i >= 0 && i < g.bays.length && i !== doorIdx;
 
   g.bays.forEach((b, i) => {
-    if (i === doorIdx) return;
+    if (!isScreenable(i)) return;
     const a = b[0], c = b[1], w = c - a;
+    // a shared post between two screened bays gets one vertical piece
+    // (below), not one from each side, so surface skips its own here
+    const edges = surface
+      ? { left: !isScreenable(i - 1), right: !isScreenable(i + 1) }
+      : undefined;
 
     if (split === "single") {
-      s += slopeFrame(a, c, g.rakeY, g.deckTopY, t, color);
+      s += slopeFrame(a, c, g.rakeY, g.deckTopY, t, color, edges);
       return;
     }
 
-    s += slopeFrame(a, c, g.rakeY, g.headerTopY, t, color);
+    s += slopeFrame(a, c, g.rakeY, g.headerTopY, t, color, edges);
 
     if (split === "transom") {
-      s += flatFrame(a, g.headerBotY, w, g.deckTopY - g.headerBotY, t, color);
+      s += flatFrame(a, g.headerBotY, w, g.deckTopY - g.headerBotY, t, color, edges);
     } else {
-      // the split sits at the bottom of the handrail's cap board — not the
-      // sub-rail below it that the balusters mortise into — since that's
-      // what the track actually mounts to; the two frames share a single
-      // spline piece spanning just the cap board's own thickness
-      const railBot = g.railTopSubY;
-      s += flatFrame(a, g.headerBotY, w, g.railTopCapY - g.headerBotY, t, color, { bottom: false });
-      s += flatFrame(a, railBot, w, g.deckTopY - railBot, t, color, { top: false });
+      // the below-rail piece has to clear the whole handrail (both the
+      // cap and the sub-rail the balusters mortise into), not stop partway
+      // through it — otherwise it visually overlaps the rail instead of
+      // sitting below it. The two frames share a single spline piece that
+      // spans that full thickness instead of each having its own cap
+      const railBot = g.railTopSubY + g.railTopSubH;
+      s += flatFrame(a, g.headerBotY, w, g.railTopCapY - g.headerBotY, t, color, { ...edges, bottom: false });
+      s += flatFrame(a, railBot, w, g.deckTopY - railBot, t, color, { ...edges, top: false });
       s += surface
         ? rect(a - t, g.railTopCapY, w + 2 * t, railBot - g.railTopCapY, color)
         : rect(a, g.railTopCapY, w, railBot - g.railTopCapY, color);
     }
   });
+
+  if (surface) {
+    g.bays.forEach((b, i) => {
+      if (!isScreenable(i) || !isScreenable(i + 1)) return;
+      const xCenter = (b[1] + g.bays[i + 1][0]) / 2;
+      s += sharedPostVertical(cfg, g, xCenter, t, color);
+    });
+  }
+
   return s;
 }
 

@@ -93,6 +93,7 @@ const CONFIG = {
   screenMount:       "surface", // "surface" | "inset" (their "Mini Track")
   screenWidth:       "standard",// "standard" (1.5") | "wide" (3.5") — surface mount only
   screenColor:       "#FFFFFF", // White | Black | Dark Bronze
+  screenSplit:       "transom", // "single" (whole bay) | "transom" (transom + main) | "all" (transom + above/below rail)
 
   pxPerFt:           34,
 
@@ -302,32 +303,60 @@ function frameInside(x, y, w, h, t, color) {
          rect(x + w - t, y, t, h, color);
 }
 
-/* screen molding over the non-door bays, covering both the transom above
-   the header and the main opening below it. Surface mount is one
-   continuous frame per opening, unbroken by the handrail; inset (their
-   "Mini Track") is trimmed to each part separately, split above and
-   below the handrail itself (the rail's own thickness isn't screened). */
+/* Same idea, but the top edge follows a sloped line (topFn(x)) instead of
+   a flat y — used where the frame has to follow the roof rake, and needs
+   its verticals to meet that line at the right height on each side. */
+function slopedFrameOutside(a, c, topFn, bottomY, t, color) {
+  const topL = topFn(a), topR = topFn(c);
+  return poly(`${a - t},${topL - t} ${c + t},${topR - t} ${c + t},${topR} ${a - t},${topL}`, color) +
+         rect(a - t, bottomY, (c - a) + 2 * t, t, color) +
+         rect(a - t, topL, t, (bottomY - topL) + t, color) +
+         rect(c, topR, t, (bottomY - topR) + t, color);
+}
+function slopedFrameInside(a, c, topFn, bottomY, t, color) {
+  const topL = topFn(a), topR = topFn(c);
+  return poly(`${a},${topL} ${c},${topR} ${c},${topR + t} ${a},${topL + t}`, color) +
+         rect(a, bottomY - t, c - a, t, color) +
+         rect(a, topL, t, bottomY - topL, color) +
+         rect(c - t, topR, t, bottomY - topR, color);
+}
+
+/* screen molding over the non-door bays. screenSplit controls how many
+   pieces make up each bay:
+   - "single": one frame per bay, roofline to floor, running straight
+     through the header and handrail.
+   - "transom": a transom piece (following the rake) plus one frame for
+     the whole main opening, unbroken by the handrail.
+   - "all": transom, then separate frames above and below the handrail —
+     the handrail's own thickness is left unmolded either way, since real
+     track is a single top-and-bottom-receiving piece, not a wrap. */
 function drawScreens(cfg, g, doorIdx) {
   if (!cfg.screensOn) return "";
   let s = "";
   const color = cfg.screenColor;
   const surface = cfg.screenMount === "surface";
-  const frame = surface ? frameOutside : frameInside;
+  const flatFrame = surface ? frameOutside : frameInside;
+  const slopeFrame = surface ? slopedFrameOutside : slopedFrameInside;
   const t = surface ? g.inch(cfg.screenWidth === "wide" ? 3.5 : 1.5) : g.inch(0.75);
+  const split = cfg.screenSplit;
 
   g.bays.forEach((b, i) => {
     if (i === doorIdx) return;
     const a = b[0], c = b[1], w = c - a;
-    const transomTopY = g.rakeY((a + c) / 2);
 
-    s += frame(a, transomTopY, w, g.headerTopY - transomTopY, t, color);
+    if (split === "single") {
+      s += slopeFrame(a, c, g.rakeY, g.deckTopY, t, color);
+      return;
+    }
 
-    if (surface) {
-      s += frame(a, g.headerBotY, w, g.deckTopY - g.headerBotY, t, color);
+    s += slopeFrame(a, c, g.rakeY, g.headerTopY, t, color);
+
+    if (split === "transom") {
+      s += flatFrame(a, g.headerBotY, w, g.deckTopY - g.headerBotY, t, color);
     } else {
-      s += frame(a, g.headerBotY, w, g.railTopCapY - g.headerBotY, t, color);
+      s += flatFrame(a, g.headerBotY, w, g.railTopCapY - g.headerBotY, t, color);
       const belowRailY = g.railTopSubY + g.railTopSubH;
-      s += frame(a, belowRailY, w, g.deckTopY - belowRailY, t, color);
+      s += flatFrame(a, belowRailY, w, g.deckTopY - belowRailY, t, color);
     }
   });
   return s;
@@ -509,8 +538,6 @@ function drawPorch(cfg, uid) {
     s += rect(x + g.PW - 4, top, 4, g.deckTopY - top, "rgba(0,0,0,0.14)");
   });
 
-  s += drawScreens(cfg, g, doorIdx);
-
   // deck band
   s += rect(g.x0, g.deckTopY, g.x1 - g.x0, g.deckFasciaH, "var(--floor)");
   s += rect(g.x0, g.deckTopY, g.x1 - g.x0, 3, "rgba(255,255,255,0.16)");
@@ -528,6 +555,10 @@ function drawPorch(cfg, uid) {
   });
   g.posts.forEach(x => s += rect(x, g.skirtTopY, g.PW, g.groundY - g.skirtTopY, "var(--skirt)"));
   s += rect(g.x0, g.groundY - 4, g.x1 - g.x0, 4, "rgba(0,0,0,0.25)");
+
+  // molding is surface-applied trim, so it's drawn last — otherwise the
+  // deck band paints right over the bottom of the frame
+  s += drawScreens(cfg, g, doorIdx);
 
   if (L) s += landingSteps(L, g, cfg);
 
@@ -755,6 +786,7 @@ const SHARE_SCHEMA = {
   screenMount:      { code: "scM", type: "str" },
   screenWidth:      { code: "scW", type: "str" },
   screenColor:      { code: "scC", type: "str" },
+  screenSplit:      { code: "scS", type: "str" },
   pxPerFt:          { code: "px",  type: "num" },
   colors:           { code: "col", type: "colors" }
 };
@@ -823,6 +855,8 @@ buildSelect("ctlScreens", "screenMount", "Mount type",
   [["surface", "Surface mounted"], ["inset", "Inset (Mini Track)"]]);
 buildSelect("ctlScreens", "screenWidth", "Molding width",
   [["standard", "Standard (1.5\")"], ["wide", "Wide (3.5\")"]]);
+buildSelect("ctlScreens", "screenSplit", "Bay coverage",
+  [["single", "Whole bay, 1 piece"], ["transom", "Transom + main opening"], ["all", "Transom + above/below rail"]]);
 insertFieldGroup("ctlScreens", "Molding color");
 buildSwatches("ctlScreenColors", "screenColor", SCREEN_COLORS);
 

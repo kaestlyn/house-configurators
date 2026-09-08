@@ -350,7 +350,7 @@ function sharedPostVertical(cfg, g, xCenter, t, color) {
   } else {
     const railBot = g.railTopSubY + g.railTopSubH;
     s += rect(x0, g.headerBotY, t, g.railTopCapY - g.headerBotY, color);
-    s += rect(x0, g.railTopCapY, t, railBot - g.railTopCapY, color);
+    s += rect(x0, g.railTopCapY, t, t, color);
     s += rect(x0, railBot, t, g.deckTopY - railBot, color);
   }
   return s;
@@ -398,21 +398,15 @@ function drawScreens(cfg, g, doorIdx) {
       // the below-rail piece has to clear the whole handrail (both the
       // cap and the sub-rail the balusters mortise into), not stop partway
       // through it — otherwise it visually overlaps the rail instead of
-      // sitting below it. The two frames share a single spline piece that
-      // spans that full thickness instead of each having its own cap
+      // sitting below it. Above and below share one thin cap, at normal
+      // molding thickness, mounted to the bottom of the cap board, rather
+      // than each having its own — the rest of the handrail stays bare
       const railBot = g.railTopSubY + g.railTopSubH;
       s += flatFrame(a, g.headerBotY, w, g.railTopCapY - g.headerBotY, t, color, { ...edges, bottom: false });
       s += flatFrame(a, railBot, w, g.deckTopY - railBot, t, color, { ...edges, top: false });
-      const railH = railBot - g.railTopCapY;
-      if (surface) {
-        // a solid batten across the whole opening, same as real surface trim
-        s += rect(a - t, g.railTopCapY, w + 2 * t, railH, color);
-      } else {
-        // inset stays a thin outline — just the two side pieces continuing
-        // through, not a solid fill hiding the rail behind them
-        if (!edges || edges.left !== false) s += rect(a, g.railTopCapY, t, railH, color);
-        if (!edges || edges.right !== false) s += rect(c - t, g.railTopCapY, t, railH, color);
-      }
+      s += surface
+        ? rect(a - t, g.railTopCapY, w + 2 * t, t, color)
+        : rect(a, g.railTopCapY, w, t, color);
     }
   });
 

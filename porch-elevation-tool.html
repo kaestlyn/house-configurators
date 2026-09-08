@@ -66,15 +66,15 @@
 
 const CONFIG = {
   bays:              4,     // bays drawn (the real porch has ~10)
-  bayWidthFt:        4.6,   // nominal clear width; sets the total run. The door
+  bayWidthFt:        43/12, // nominal clear width (43"); sets the total run. The door
                              // bay is pinned to doorWidthFt, the rest split what's left evenly
   postSizeIn:        5.5,   // 6x6 actual
-  openingHeightFt:   7,     // deck to underside of header
-  railHeightFt:      3.4,   // deck to top of handrail
+  openingHeightFt:   6.25,  // deck to underside of header — 6.25 + the 0.75 header = 7' to the top of the header
+  railHeightFt:      4,     // deck to top of handrail
   railBotFt:         0.42,  // deck to bottom rail — 0.42 sits it flush with the floor (matches railBotH)
   deckAboveGradeFt:  2.5,   // deck surface above grade
-  transomTallFt:     2.3,   // transom height at the house end
-  transomShortFt:    1.0,   // transom height at the far end
+  transomTallFt:     14/12, // transom height at the house end (14")
+  transomShortFt:    0,     // transom height at the far end — flush with the header
 
   showDoor:          true,
   doorBay:           4,     // 1-based; the door fills this bay
@@ -255,11 +255,17 @@ const rect = (x, y, w, h, f) =>
   `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${f}"/>`;
 const poly = (pts, f) => `<polygon points="${pts}" fill="${f}"/>`;
 
-/* balusters filling a run, ~4" gaps */
+/* balusters filling a run, spaced evenly so the gap at each end matches
+   the gaps between balusters (rather than running a fixed gap from the
+   left edge and leaving a leftover remainder on the right). */
 function balusters(a, b, top, bottom, g) {
-  const bw = g.inch(1.6), gap = g.inch(3.9);
+  const bw = g.inch(1.6), targetGap = g.inch(3.9);
+  const w = b - a;
+  const n = Math.max(1, Math.round((w - targetGap) / (bw + targetGap)));
+  const gap = (w - n * bw) / (n + 1);
   let s = "";
-  for (let x = a + gap; x + bw < b - gap * 0.4; x += bw + gap) {
+  for (let i = 0; i < n; i++) {
+    const x = a + gap + i * (bw + gap);
     s += rect(x, top, bw, bottom - top, "var(--spindle)");
   }
   return s;

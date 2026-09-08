@@ -403,9 +403,16 @@ function drawScreens(cfg, g, doorIdx) {
       const railBot = g.railTopSubY + g.railTopSubH;
       s += flatFrame(a, g.headerBotY, w, g.railTopCapY - g.headerBotY, t, color, { ...edges, bottom: false });
       s += flatFrame(a, railBot, w, g.deckTopY - railBot, t, color, { ...edges, top: false });
-      s += surface
-        ? rect(a - t, g.railTopCapY, w + 2 * t, railBot - g.railTopCapY, color)
-        : rect(a, g.railTopCapY, w, railBot - g.railTopCapY, color);
+      const railH = railBot - g.railTopCapY;
+      if (surface) {
+        // a solid batten across the whole opening, same as real surface trim
+        s += rect(a - t, g.railTopCapY, w + 2 * t, railH, color);
+      } else {
+        // inset stays a thin outline — just the two side pieces continuing
+        // through, not a solid fill hiding the rail behind them
+        if (!edges || edges.left !== false) s += rect(a, g.railTopCapY, t, railH, color);
+        if (!edges || edges.right !== false) s += rect(c - t, g.railTopCapY, t, railH, color);
+      }
     }
   });
 

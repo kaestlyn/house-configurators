@@ -571,7 +571,6 @@ function drawPorch(cfg, uid) {
     s += rect(a, t, g.inch(2), u - t, "var(--skirt)");
     s += rect(c - g.inch(2), t, g.inch(2), u - t, "var(--skirt)");
   }
-  g.posts.forEach(x => s += rect(x, g.skirtTopY, g.PW, g.groundY - g.skirtTopY, "var(--skirt)"));
   s += rect(g.x0, g.groundY - 4, g.x1 - g.x0, 4, "rgba(0,0,0,0.25)");
 
   // molding is surface-applied trim, so it's drawn last — otherwise the

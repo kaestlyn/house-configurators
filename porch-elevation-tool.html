@@ -338,15 +338,19 @@ function slopedFrameInside(a, c, topFn, bottomY, t, color) {
    and a wide board should span it as one piece rather than each bay
    mounting its own overlapping half. The spline mount always runs the
    full height of whatever opening it covers — "all" only adds a
-   bisecting cap at the rail, it doesn't split the vertical run. */
+   bisecting cap at the rail, it doesn't split the vertical run. Each
+   segment extends past the header/floor by t, the same as the bays'
+   own edges do, so it reaches the far side of the horizontal caps
+   instead of stopping short at their near edge. */
 function sharedPostVertical(cfg, g, xCenter, t, color) {
   const split = cfg.screenSplit;
   const x0 = xCenter - t / 2;
   const rakeTop = g.rakeY(xCenter);
-  if (split === "single") return rect(x0, rakeTop, t, g.deckTopY - rakeTop, color);
+  if (split === "single") return rect(x0, rakeTop, t, (g.deckTopY - rakeTop) + t, color);
 
-  return rect(x0, rakeTop, t, g.headerTopY - rakeTop, color) +
-         rect(x0, g.headerBotY, t, g.deckTopY - g.headerBotY, color);
+  const mainTop = g.headerBotY - t;
+  return rect(x0, rakeTop, t, (g.headerTopY - rakeTop) + t, color) +
+         rect(x0, mainTop, t, (g.deckTopY - mainTop) + t, color);
 }
 
 /* screen molding over the non-door bays. screenSplit controls how many

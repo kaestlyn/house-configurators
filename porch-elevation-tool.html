@@ -5,6 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Porch Elevation Tool</title>
 <link rel="stylesheet" href="shared.css">
+<style>
+  .screen-swatch { width:36px; height:36px; border-radius:50%; border:2px solid rgba(0,0,0,0.2);
+    cursor:pointer; padding:0; }
+  .screen-swatch.selected { outline:2px solid var(--accent, #4a90d9); outline-offset:2px; }
+</style>
 </head>
 <body>
 <nav class="tools">
@@ -23,6 +28,7 @@
   <div class="tabbar">
     <button type="button" class="active" data-tab="tabPorch">Porch</button>
     <button type="button" data-tab="tabDoor">Door, landing &amp; steps</button>
+    <button type="button" data-tab="tabScreens">Screens</button>
     <button type="button" data-tab="tabAppearance">Appearance</button>
     <button type="button" data-tab="tabChecks">Checks</button>
   </div>
@@ -33,6 +39,11 @@
 
   <div class="panel tabpanel" id="tabDoor">
     <div class="grid" id="ctlDoor"></div>
+  </div>
+
+  <div class="panel tabpanel" id="tabScreens">
+    <div class="grid" id="ctlScreens"></div>
+    <div class="swatches" id="ctlScreenColors"></div>
   </div>
 
   <div class="panel tabpanel" id="tabAppearance">
@@ -75,6 +86,11 @@ const CONFIG = {
   stairAlign:        "center",  // "left" | "center" | "right"
   riserInches:       7,
 
+  screensOn:         false,     // Screen Tight-style molding over the non-door bays
+  screenMount:       "surface", // "surface" | "inset" (their "Mini Track")
+  screenWidth:       "standard",// "standard" (1.5") | "wide" (3.5") — surface mount only
+  screenColor:       "#FFFFFF", // White | Black | Dark Bronze
+
   pxPerFt:           34,
 
   // appearance — a starting palette, freely editable below
@@ -98,6 +114,12 @@ const PALETTES = [
   { name:"White frame, black rail", c:{
       post:"#EFEBE2", beam:"#EFEBE2", rail:"#EFEBE2", spindle:"#2C2A27",
       floor:"#3B3430", riser:"#3B3430", skirt:"#EFEBE2", skirtbg:"#2A2522", interior:"#2E2C29" } }
+];
+
+const SCREEN_COLORS = [
+  ["#FFFFFF", "White"],
+  ["#040707", "Black"],
+  ["#423314", "Dark Bronze"]
 ];
 
 const COLOR_ROLES = [
@@ -243,6 +265,44 @@ function balusters(a, b, top, bottom, g) {
   return s;
 }
 
+/* Screen Tight-style molding border, drawn either proud of an opening
+   ("surface", outside the given rect) or trimmed just inside it ("inset"). */
+function frameOutside(x, y, w, h, t, color) {
+  return rect(x - t, y - t, w + 2 * t, t, color) +
+         rect(x - t, y + h, w + 2 * t, t, color) +
+         rect(x - t, y, t, h, color) +
+         rect(x + w, y, t, h, color);
+}
+function frameInside(x, y, w, h, t, color) {
+  return rect(x, y, w, t, color) +
+         rect(x, y + h - t, w, t, color) +
+         rect(x, y, t, h, color) +
+         rect(x + w - t, y, t, h, color);
+}
+
+/* screen molding over the non-door bays. Surface mount is one continuous
+   frame around the whole opening; inset (their "Mini Track") is trimmed
+   to each part of the bay separately, since the handrail interrupts it. */
+function drawScreens(cfg, g, doorIdx) {
+  if (!cfg.screensOn) return "";
+  let s = "";
+  const color = cfg.screenColor;
+  g.bays.forEach((b, i) => {
+    if (i === doorIdx) return;
+    const a = b[0], c = b[1];
+    if (cfg.screenMount === "surface") {
+      const t = g.inch(cfg.screenWidth === "wide" ? 3.5 : 1.5);
+      s += frameOutside(a, g.headerBotY, c - a, g.railBotY - g.headerBotY, t, color);
+    } else {
+      const t = g.inch(0.75);
+      s += frameInside(a, g.headerBotY, c - a, (g.railTopY + g.railTopH) - g.headerBotY, t, color);
+      const ly0 = g.railBotY + g.railBotH;
+      s += frameInside(a, ly0, c - a, g.deckTopY - ly0, t, color);
+    }
+  });
+  return s;
+}
+
 /* screen door filling its whole bay */
 function screenDoor(bay, g, cfg) {
   const a = bay[0], w = bay[1] - bay[0];
@@ -384,8 +444,9 @@ function drawPorch(cfg, uid) {
   s += poly(`${g.x0 - g.ft(0.4)},${rl - RB} ${g.x1 + g.ft(0.4)},${rr - RB} ${g.x1 + g.ft(0.4)},${rr} ${g.x0 - g.ft(0.4)},${rl}`, "#F1EDE5");
   s += poly(`${g.x0 - g.ft(0.4)},${rl - 4} ${g.x1 + g.ft(0.4)},${rr - 4} ${g.x1 + g.ft(0.4)},${rr} ${g.x0 - g.ft(0.4)},${rl}`, "rgba(0,0,0,0.14)");
 
-  // transom dividers, mid-bay
-  g.bays.forEach(b => {
+  // transom dividers, mid-bay (skipped over the door — it has its own frame)
+  g.bays.forEach((b, i) => {
+    if (i === doorIdx) return;
     const x = (b[0] + b[1]) / 2 - g.inch(2);
     s += rect(x, g.rakeY(x), g.inch(4), g.headerTopY - g.rakeY(x), "var(--beam)");
   });
@@ -420,6 +481,8 @@ function drawPorch(cfg, uid) {
     s += rect(x, top, g.PW, g.deckTopY - top, "var(--post)");
     s += rect(x + g.PW - 4, top, 4, g.deckTopY - top, "rgba(0,0,0,0.14)");
   });
+
+  s += drawScreens(cfg, g, doorIdx);
 
   // deck band
   s += rect(g.x0, g.deckTopY, g.x1 - g.x0, g.deckFasciaH, "var(--floor)");
@@ -546,6 +609,7 @@ function buildNumbers(hostId, fields) {
 function buildSelect(hostId, key, label, options) {
   const host = document.getElementById(hostId);
   const l = document.createElement("label");
+  l.dataset.key = key;
   l.innerHTML = `<span>${label}</span>`;
   const sel = document.createElement("select");
   options.forEach(([v, t]) => {
@@ -560,6 +624,27 @@ function buildSelect(hostId, key, label, options) {
     render();
   });
   l.appendChild(sel); host.appendChild(l);
+}
+
+function buildSwatches(hostId, key, options) {
+  const host = document.getElementById(hostId);
+  const buttons = [];
+  options.forEach(([hex, name]) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "screen-swatch";
+    b.style.background = hex;
+    b.title = name;
+    b.setAttribute("aria-label", name);
+    if (CONFIG[key] === hex) b.classList.add("selected");
+    b.addEventListener("click", () => {
+      CONFIG[key] = hex;
+      buttons.forEach(x => x.classList.toggle("selected", x === b));
+      render();
+    });
+    buttons.push(b);
+    host.appendChild(b);
+  });
 }
 
 function buildToggle(hostId, key, label) {
@@ -600,6 +685,10 @@ const SHARE_SCHEMA = {
   stairPct:         { code: "sp",  type: "num" },
   stairAlign:       { code: "sa",  type: "str" },
   riserInches:      { code: "ri",  type: "num" },
+  screensOn:        { code: "scO", type: "bool" },
+  screenMount:      { code: "scM", type: "str" },
+  screenWidth:      { code: "scW", type: "str" },
+  screenColor:      { code: "scC", type: "str" },
   pxPerFt:          { code: "px",  type: "num" },
   colors:           { code: "col", type: "colors" }
 };
@@ -607,6 +696,7 @@ const COLOR_KEYS = COLOR_ROLES.map(([k]) => k);
 const share = createShareLink(CONFIG, SHARE_SCHEMA, COLOR_KEYS);
 
 function render() {
+  updateScreenFieldVisibility();
   document.getElementById("checks").innerHTML = runChecks(CONFIG).map(c =>
     `<div class="chk ${c.ok ? "ok" : "warn"}"><span class="dot"></span>` +
     `<span><span class="lbl">${c.label}</span> <b>${c.value}</b></span></div>`).join("");
@@ -660,6 +750,20 @@ buildSelect("ctlDoor", "landingBays", "Landing size",
 buildNumbers("ctlDoor", FIELDS_LANDING);
 buildSelect("ctlDoor", "stairAlign", "Stair alignment",
   [["center", "Center"], ["left", "Left"], ["right", "Right"]]);
+
+insertFieldGroup("ctlScreens", "Screens");
+buildToggle("ctlScreens", "screensOn", "Screens on (non-door bays)");
+buildSelect("ctlScreens", "screenMount", "Mount type",
+  [["surface", "Surface mounted"], ["inset", "Inset (Mini Track)"]]);
+buildSelect("ctlScreens", "screenWidth", "Molding width",
+  [["standard", "Standard (1.5\")"], ["wide", "Wide (3.5\")"]]);
+insertFieldGroup("ctlScreens", "Molding color");
+buildSwatches("ctlScreenColors", "screenColor", SCREEN_COLORS);
+
+function updateScreenFieldVisibility() {
+  const widthRow = document.querySelector('#ctlScreens label[data-key="screenWidth"]');
+  if (widthRow) widthRow.hidden = CONFIG.screenMount !== "surface";
+}
 
 buildAppearanceSection({
   paletteHostId: "ctlAppearance",

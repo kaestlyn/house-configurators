@@ -559,21 +559,18 @@ function drawPorch(cfg, uid) {
   s += rect(g.x0, g.deckTopY, g.x1 - g.x0, g.deckFasciaH, "var(--floor)");
   s += rect(g.x0, g.deckTopY, g.x1 - g.x0, 3, "rgba(255,255,255,0.16)");
 
-  // skirt: one diamond lattice panel spanning the whole run (split only
-  // where the door interrupts it), flush to the frame with no per-bay gaps
+  // skirt: one diamond lattice panel running uninterrupted the whole way
+  // to the end of the deck, flush to the frame with no margin — the
+  // landing/steps (drawn afterward) cover whatever's behind them
   s += rect(g.x0, g.skirtTopY, g.x1 - g.x0, g.groundY - g.skirtTopY, "var(--skirtbg)");
-  const skirtRuns = doorIdx < 0
-    ? [[g.x0, g.x1]]
-    : [[g.x0, g.bays[doorIdx][0]], [g.bays[doorIdx][1], g.x1]];
-  skirtRuns.forEach(([a, c]) => {
-    if (c - a <= 0) return;
-    const t = g.skirtTopY, u = g.groundY;
+  {
+    const a = g.x0, c = g.x1, t = g.skirtTopY, u = g.groundY;
     s += rect(a, t, c - a, u - t, `url(#lat${uid})`);
     s += rect(a, t, c - a, g.inch(2), "var(--skirt)");
     s += rect(a, u - g.inch(2), c - a, g.inch(2), "var(--skirt)");
     s += rect(a, t, g.inch(2), u - t, "var(--skirt)");
     s += rect(c - g.inch(2), t, g.inch(2), u - t, "var(--skirt)");
-  });
+  }
   g.posts.forEach(x => s += rect(x, g.skirtTopY, g.PW, g.groundY - g.skirtTopY, "var(--skirt)"));
   s += rect(g.x0, g.groundY - 4, g.x1 - g.x0, 4, "rgba(0,0,0,0.25)");
 

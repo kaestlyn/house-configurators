@@ -70,11 +70,11 @@ const CONFIG = {
                              // bay is pinned to doorWidthFt, the rest split what's left evenly
   postSizeIn:        5.5,   // 6x6 actual
   openingHeightFt:   6.25,  // deck to underside of header — 6.25 + the 0.75 header = 7' to the top of the header
-  railHeightFt:      4,     // deck to top of handrail
-  railBotFt:         0.42,  // deck to bottom rail — 0.42 sits it flush with the floor (matches railBotH)
+  railHeightFt:      4,     // deck to top of the handrail cap
+  railBotFt:         0,     // deck to the bottom of the rail assembly — 0 sits it flush with the floor
   deckAboveGradeFt:  2.5,   // deck surface above grade
-  transomTallFt:     14/12, // transom height at the house end (14")
-  transomShortFt:    0,     // transom height at the far end — flush with the header
+  transomTallIn:     14,    // transom height at the house end (in)
+  transomShortIn:    0,     // transom height at the far end — flush with the header (in)
 
   showDoor:          true,
   doorBay:           4,     // 1-based; the door fills this bay
@@ -174,21 +174,32 @@ function geometry(cfg) {
 
   // vertical stack, worked down from the tallest point
   const roofTopL = topPad;
-  const headerTopY = roofTopL + roofBand + ft(cfg.transomTallFt);
+  const headerTopY = roofTopL + roofBand + inch(cfg.transomTallIn);
   const headerBotY = headerTopY + headerH;
   const deckTopY = headerBotY + ft(cfg.openingHeightFt);
   const deckFasciaH = ft(0.62);
   const groundY = deckTopY + ft(cfg.deckAboveGradeFt);
   const skirtTopY = deckTopY + deckFasciaH;
 
-  const railTopY = deckTopY - ft(cfg.railHeightFt);
-  const railTopH = ft(0.45);
-  const railBotY = deckTopY - ft(cfg.railBotFt);
-  const railBotH = ft(0.42);
+  // top rail: a 1.5" cap over a 1.5" sub-rail that the balusters hook into.
+  // bottom rail: a 1.5" sub-rail the balusters hook into, over a 1.5" base
+  // board — railBotFt measures to the bottom of that base board, so 0 sits
+  // the whole assembly flush with the floor.
+  const boardH = inch(1.5);
+  const railTopCapY = deckTopY - ft(cfg.railHeightFt);
+  const railTopCapH = boardH;
+  const railTopSubY = railTopCapY + boardH;
+  const railTopSubH = boardH;
+
+  const railBotBaseBotY = deckTopY - ft(cfg.railBotFt);
+  const railBotBaseY = railBotBaseBotY - boardH;
+  const railBotBaseH = boardH;
+  const railBotSubY = railBotBaseY - boardH;
+  const railBotSubH = boardH;
 
   // rake: roof underside falls from the house end to the far end
-  const rakeL = headerTopY - ft(cfg.transomTallFt);
-  const rakeR = headerTopY - ft(cfg.transomShortFt);
+  const rakeL = headerTopY - inch(cfg.transomTallIn);
+  const rakeR = headerTopY - inch(cfg.transomShortIn);
   const rakeY = x => rakeL + (x - x0) * ((rakeR - rakeL) / (x1 - x0));
 
   // posts and bays, built cumulatively since bay widths may differ
@@ -205,7 +216,9 @@ function geometry(cfg) {
   return { S, ft, inch, PW, bayWidths, doorBayIdx, x0, x1, posts, bays, rakeY,
            roofTopL, roofBand, headerTopY, headerBotY, headerH,
            deckTopY, deckFasciaH, skirtTopY, groundY,
-           railTopY, railTopH, railBotY, railBotH, W, H };
+           railTopCapY, railTopCapH, railTopSubY, railTopSubH,
+           railBotSubY, railBotSubH, railBotBaseY, railBotBaseH, railBotBaseBotY,
+           W, H };
 }
 
 /* landing and stair extents, in px. "1 bay" is just the door bay; "1.5"
@@ -298,12 +311,12 @@ function drawScreens(cfg, g, doorIdx) {
     const a = b[0], c = b[1];
     if (cfg.screenMount === "surface") {
       const t = g.inch(cfg.screenWidth === "wide" ? 3.5 : 1.5);
-      s += frameOutside(a, g.headerBotY, c - a, g.railBotY - g.headerBotY, t, color);
+      s += frameOutside(a, g.headerBotY, c - a, g.railBotSubY - g.headerBotY, t, color);
     } else {
       const t = g.inch(0.75);
-      s += frameInside(a, g.headerBotY, c - a, (g.railTopY + g.railTopH) - g.headerBotY, t, color);
-      const ly0 = g.railBotY + g.railBotH;
-      s += frameInside(a, ly0, c - a, g.deckTopY - ly0, t, color);
+      const uy1 = g.railTopSubY + g.railTopSubH;
+      s += frameInside(a, g.headerBotY, c - a, uy1 - g.headerBotY, t, color);
+      s += frameInside(a, g.railBotBaseBotY, c - a, g.deckTopY - g.railBotBaseBotY, t, color);
     }
   });
   return s;
@@ -461,15 +474,19 @@ function drawPorch(cfg, uid) {
   runs.forEach(run => {
     const w = run[1] - run[0];
     if (w <= 0) return;
-    s += rect(run[0], g.railTopY, w, g.railTopH, "var(--rail)");
-    s += rect(run[0], g.railTopY + g.railTopH - 3, w, 3, "rgba(0,0,0,0.15)");
-    s += rect(run[0], g.railBotY, w, g.railBotH, "var(--rail)");
+    s += rect(run[0], g.railTopCapY, w, g.railTopCapH, "var(--rail)");
+    s += rect(run[0], g.railTopCapY + g.railTopCapH - 3, w, 3, "rgba(0,0,0,0.15)");
+    s += rect(run[0], g.railTopSubY, w, g.railTopSubH, "var(--rail)");
+    s += rect(run[0], g.railTopSubY + g.railTopSubH - 3, w, 3, "rgba(0,0,0,0.15)");
+    s += rect(run[0], g.railBotSubY, w, g.railBotSubH, "var(--rail)");
+    s += rect(run[0], g.railBotSubY + g.railBotSubH - 3, w, 3, "rgba(0,0,0,0.15)");
+    s += rect(run[0], g.railBotBaseY, w, g.railBotBaseH, "var(--rail)");
   });
 
-  // spindles
+  // spindles — hooked between the top and bottom sub-rails
   g.bays.forEach((b, i) => {
     if (i === doorIdx) return;
-    s += balusters(b[0], b[1], g.railTopY + g.railTopH, g.railBotY, g);
+    s += balusters(b[0], b[1], g.railTopSubY + g.railTopSubH, g.railBotSubY, g);
   });
 
   if (doorIdx >= 0) s += screenDoor(g.bays[doorIdx], g, cfg);
@@ -568,12 +585,12 @@ const FIELDS_PORCH_LAYOUT = [
 ];
 const FIELDS_PORCH_OPENINGS = [
   ["openingHeightFt", "Opening height (ft)", 4, 12, 0.1],
-  ["transomTallFt", "Transom, house end (ft)", 0, 6, 0.1],
-  ["transomShortFt", "Transom, far end (ft)", 0, 6, 0.1]
+  ["transomTallIn", "Transom, house end (in)", 0, 72, 0.5],
+  ["transomShortIn", "Transom, far end (in)", 0, 72, 0.5]
 ];
 const FIELDS_PORCH_RAIL_DECK = [
   ["railHeightFt", "Rail height (ft)", 2.5, 4.5, 0.1],
-  ["railBotFt", "Rail bottom (ft)", 0, 2, 0.05],
+  ["railBotFt", "Rail bottom (ft, 0 = floor)", 0, 2, 0.05],
   ["deckAboveGradeFt", "Deck above grade (ft)", 0.5, 8, 0.25]
 ];
 const FIELDS_PORCH_SCALE = [
@@ -674,8 +691,8 @@ const SHARE_SCHEMA = {
   railHeightFt:     { code: "rh",  type: "num" },
   railBotFt:        { code: "rb",  type: "num" },
   deckAboveGradeFt: { code: "dg",  type: "num" },
-  transomTallFt:    { code: "tt",  type: "num" },
-  transomShortFt:   { code: "ts",  type: "num" },
+  transomTallIn:    { code: "tt",  type: "num" },
+  transomShortIn:   { code: "ts",  type: "num" },
   showDoor:         { code: "sd",  type: "bool" },
   doorBay:          { code: "db",  type: "num" },
   doorWidthFt:      { code: "dw",  type: "num" },

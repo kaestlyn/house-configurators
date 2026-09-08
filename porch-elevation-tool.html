@@ -336,24 +336,17 @@ function slopedFrameInside(a, c, topFn, bottomY, t, color) {
 /* One continuous vertical strip at a shared post between two screened
    bays — surface mount only, since surface trim runs proud of the post
    and a wide board should span it as one piece rather than each bay
-   mounting its own overlapping half. Segmented the same way the bays'
-   own edges are, so it still breaks at the header and handrail. */
+   mounting its own overlapping half. The spline mount always runs the
+   full height of whatever opening it covers — "all" only adds a
+   bisecting cap at the rail, it doesn't split the vertical run. */
 function sharedPostVertical(cfg, g, xCenter, t, color) {
   const split = cfg.screenSplit;
   const x0 = xCenter - t / 2;
   const rakeTop = g.rakeY(xCenter);
   if (split === "single") return rect(x0, rakeTop, t, g.deckTopY - rakeTop, color);
 
-  let s = rect(x0, rakeTop, t, g.headerTopY - rakeTop, color);
-  if (split === "transom") {
-    s += rect(x0, g.headerBotY, t, g.deckTopY - g.headerBotY, color);
-  } else {
-    const railBot = g.railTopSubY + g.railTopSubH;
-    s += rect(x0, g.headerBotY, t, g.railTopCapY - g.headerBotY, color);
-    s += rect(x0, g.railTopCapY, t, g.inch(1.5), color);
-    s += rect(x0, railBot, t, g.deckTopY - railBot, color);
-  }
-  return s;
+  return rect(x0, rakeTop, t, g.headerTopY - rakeTop, color) +
+         rect(x0, g.headerBotY, t, g.deckTopY - g.headerBotY, color);
 }
 
 /* screen molding over the non-door bays. screenSplit controls how many
@@ -392,29 +385,24 @@ function drawScreens(cfg, g, doorIdx) {
 
     s += slopeFrame(a, c, g.rakeY, g.headerTopY, t, color, edges);
 
-    if (split === "transom") {
+    if (split === "transom" || surface) {
+      // surface's spline mount always runs the full height of the main
+      // opening as one unbroken frame — "all" only adds a bisecting cap
+      // at the rail, at a fixed 1.5" regardless of the chosen perimeter
+      // width, since that's the actual hardware crossing the rail
       s += flatFrame(a, g.headerBotY, w, g.deckTopY - g.headerBotY, t, color, edges);
-    } else {
-      // the below-rail piece has to clear the whole handrail (both the
-      // cap and the sub-rail the balusters mortise into), not stop partway
-      // through it — otherwise it visually overlaps the rail instead of
-      // sitting below it.
-      const railBot = g.railTopSubY + g.railTopSubH;
-      if (surface) {
-        // surface track is a single piece mounted across the rail, shared
-        // by both frames — always at 1.5" regardless of the chosen
-        // perimeter width, since that's the actual hardware, not a style
-        // choice
-        const capT = g.inch(1.5);
-        s += flatFrame(a, g.headerBotY, w, g.railTopCapY - g.headerBotY, t, color, { ...edges, bottom: false });
-        s += flatFrame(a, railBot, w, g.deckTopY - railBot, t, color, { ...edges, top: false });
-        s += rect(a - t, g.railTopCapY, w + 2 * t, capT, color);
-      } else {
-        // inset track is two independent pieces (Mini Track's own top and
-        // bottom track), each a complete frame — no shared piece
-        s += flatFrame(a, g.headerBotY, w, g.railTopCapY - g.headerBotY, t, color, edges);
-        s += flatFrame(a, railBot, w, g.deckTopY - railBot, t, color, edges);
+      if (surface && split === "all") {
+        s += rect(a - t, g.railTopCapY, w + 2 * t, g.inch(1.5), color);
       }
+    } else {
+      // inset (Mini Track) is genuinely two independent pieces of track —
+      // above and below each keep their own complete frame, no shared
+      // piece, and below has to clear the whole handrail (both the cap
+      // and the sub-rail the balusters mortise into) instead of stopping
+      // partway through it
+      const railBot = g.railTopSubY + g.railTopSubH;
+      s += flatFrame(a, g.headerBotY, w, g.railTopCapY - g.headerBotY, t, color, edges);
+      s += flatFrame(a, railBot, w, g.deckTopY - railBot, t, color, edges);
     }
   });
 

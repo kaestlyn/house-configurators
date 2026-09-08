@@ -348,7 +348,7 @@ function sharedPostVertical(cfg, g, xCenter, t, color) {
   if (split === "transom") {
     s += rect(x0, g.headerBotY, t, g.deckTopY - g.headerBotY, color);
   } else {
-    const railBot = g.railTopSubY;
+    const railBot = g.railTopSubY + g.railTopSubH;
     s += rect(x0, g.headerBotY, t, g.railTopCapY - g.headerBotY, color);
     s += rect(x0, g.railTopCapY, t, railBot - g.railTopCapY, color);
     s += rect(x0, railBot, t, g.deckTopY - railBot, color);

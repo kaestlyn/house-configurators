@@ -398,12 +398,13 @@ function drawScreens(cfg, g, doorIdx) {
       // the below-rail piece has to clear the whole handrail (both the
       // cap and the sub-rail the balusters mortise into), not stop partway
       // through it — otherwise it visually overlaps the rail instead of
-      // sitting below it. Above and below share one thin cap, at normal
-      // molding thickness, mounted to the bottom of the cap board, rather
-      // than each having its own — the rest of the handrail stays bare
+      // sitting below it. Above has no cap of its own (the mounting piece
+      // below stands in for it); below keeps its own top cap, so there
+      // are three lines total: the shared mounting piece, below's own
+      // top, and the floor — with the bare handrail visible between them
       const railBot = g.railTopSubY + g.railTopSubH;
       s += flatFrame(a, g.headerBotY, w, g.railTopCapY - g.headerBotY, t, color, { ...edges, bottom: false });
-      s += flatFrame(a, railBot, w, g.deckTopY - railBot, t, color, { ...edges, top: false });
+      s += flatFrame(a, railBot, w, g.deckTopY - railBot, t, color, edges);
       s += surface
         ? rect(a - t, g.railTopCapY, w + 2 * t, t, color)
         : rect(a, g.railTopCapY, w, t, color);

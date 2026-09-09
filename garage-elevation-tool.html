@@ -69,7 +69,12 @@ const CONFIG = {
   overhangInches: 16,     // eave and rake overhang
 
   showDormers:    true,
-  dormerWidths: [10, 5],  // one per door; set showDormers false to omit
+  dormerStyle:    "gable", // "gable" | "shed"
+  dormerCount:    2,      // 0, 1, or 2 — 2 only takes effect with exactly 2 doors
+  dormerPosition: "center", // "left" | "center" | "right" — used when dormerCount is 1
+  dormerOffsetFt: 0,      // left/right only: distance in from the margin-clamped edge position
+  dormerEdgeMarginFt: 2,  // left/right only: minimum clearance from the roof edge
+  dormerWidths: [10, 5],  // one per door when dormerCount is 2; dormerWidths[0] when it's 1
   dormerWallFt:   3.5,    // face wall height below the dormer gable
 
   showStairs:     true,
@@ -249,6 +254,11 @@ function overheadDoor(a, b, g, cfg) {
   return s;
 }
 
+// shed dormers are drawn head-on, so their shallow roof (which slopes
+// front-to-back, not side-to-side) reads as a flat cap of this height
+// rather than a triangular peak — there's no ridge line to draw in elevation.
+const DORMER_SHED_CAP_FT = 1.3;
+
 /* gable dormer sitting on the front roof slope */
 function dormer(cx, widthFt, g, cfg, uid) {
   const hw = g.ft(widthFt) / 2;
@@ -286,6 +296,45 @@ function dormer(cx, widthFt, g, cfg, uid) {
   return s;
 }
 
+/* shed dormer sitting on the front roof slope — a flat-topped box rather
+   than a gable, since its low roof slopes away from the viewer */
+function shedDormer(cx, widthFt, g, cfg, uid) {
+  const hw = g.ft(widthFt) / 2;
+  const base = g.eaveY - 6;
+  const wallH = g.ft(cfg.dormerWallFt);
+  const wallT = base - wallH;
+  const capT = wallT - g.ft(DORMER_SHED_CAP_FT);
+
+  // shallow roof cap: flat across (its slope runs front-to-back, invisible
+  // head-on), with a small overhang and a fascia line where it meets the wall
+  let s = rect(cx - hw - 7, capT, hw * 2 + 14, wallT - capT + 6, "var(--roof)");
+  s += rect(cx - hw - 7, capT, hw * 2 + 14, 1.8, "rgba(255,255,255,0.10)");
+  s += rect(cx - hw - 7, wallT, hw * 2 + 14, 1.8, "rgba(0,0,0,0.18)");
+
+  // siding wall face, with corner boards instead of gable rakes
+  s += rect(cx - hw, wallT, hw * 2, base - wallT, `url(#sd${uid})`);
+  s += rect(cx - hw, wallT, 6, base - wallT, "var(--trim)");
+  s += rect(cx + hw - 6, wallT, 6, base - wallT, "var(--trim)");
+  s += rect(cx - hw, base - 4, hw * 2, 4, "var(--trim)");
+
+  const ww = Math.min(hw * 2 - 26, g.ft(widthFt > 7 ? 5.8 : 2.5));
+  const apron = Math.max(g.inch(8), wallH * 0.22);
+  const wh = wallH - 14 - apron;
+  s += rect(cx - ww / 2 - 4, wallT + 7, ww + 8, wh + 8, "var(--trim)");
+  s += rect(cx - ww / 2, wallT + 11, ww, wh, "var(--glass)");
+  s += rect(cx - ww / 2, wallT + 11, ww, 1.8, "rgba(255,255,255,0.26)");
+  const mull = widthFt > 7 ? 3 : 1;
+  for (let i = 1; i <= mull; i++) {
+    s += rect(cx - ww / 2 + (ww / (mull + 1)) * i - 1, wallT + 11, 2, wh, "var(--trim)");
+  }
+  s += rect(cx - hw - 7, base, hw * 2 + 14, 3.5, "rgba(0,0,0,0.16)");
+  return s;
+}
+
+function drawDormer(cx, widthFt, g, cfg, uid) {
+  return cfg.dormerStyle === "shed" ? shedDormer(cx, widthFt, g, cfg, uid) : dormer(cx, widthFt, g, cfg, uid);
+}
+
 /* exterior stair running front-to-back along the gable wall, drawn straight
    on (no perspective taper) so it stays inline with the garage side wall. */
 function stairs(g, cfg) {
@@ -316,6 +365,13 @@ function stairs(g, cfg) {
 
   s += rect(cx - w / 2 - 6, g.wallTopY - 3, w + 12, 5, "var(--trim)");
   return s;
+}
+
+/* dormerCount as actually usable: 2 requires exactly 2 doors to anchor to,
+   otherwise it falls back to a single positioned dormer. */
+function effectiveDormerCount(cfg) {
+  if (cfg.dormerCount === 2 && cfg.doorWidths.length === 2) return 2;
+  return Math.min(cfg.dormerCount, 1);
 }
 
 /* ===================================================================
@@ -358,12 +414,32 @@ function drawGarage(cfg, uid) {
   s += rect(RL, g.ridgeY - 6, RR - RL, 8, "var(--roof)");
   s += rect(RL, g.ridgeY - 6, RR - RL, 1.8, "rgba(255,255,255,0.10)");
 
-  // dormers, one per door
+  // dormers — 2 centers one over each door (only when there are exactly 2
+  // doors to anchor to), otherwise a single dormer positioned left/center/right
   if (cfg.showDormers) {
-    g.doors.forEach((d, i) => {
-      const w = cfg.dormerWidths[i];
-      if (w > 0) s += dormer((d[0] + d[1]) / 2, w, g, cfg, uid);
-    });
+    const count = effectiveDormerCount(cfg);
+    if (count === 2) {
+      g.doors.forEach((d, i) => {
+        const w = cfg.dormerWidths[i];
+        if (w > 0) s += drawDormer((d[0] + d[1]) / 2, w, g, cfg, uid);
+      });
+    } else if (count === 1) {
+      const w = cfg.dormerWidths[0];
+      if (w > 0) {
+        const hw = g.ft(w) / 2;
+        const center = (RL + RR) / 2;
+        const inset = g.ft(cfg.dormerEdgeMarginFt) + hw;
+        let cx = center;
+        if (cfg.dormerPosition === "left") {
+          const edgeCx = RL + inset;
+          cx = Math.min(edgeCx + g.ft(cfg.dormerOffsetFt), center);
+        } else if (cfg.dormerPosition === "right") {
+          const edgeCx = RR - inset;
+          cx = Math.max(edgeCx - g.ft(cfg.dormerOffsetFt), center);
+        }
+        s += drawDormer(cx, w, g, cfg, uid);
+      }
+    }
   }
 
   // wall
@@ -431,9 +507,13 @@ function runChecks(cfg) {
 
   // dormer clearance under the ridge
   if (cfg.showDormers) {
-    cfg.dormerWidths.forEach((w, i) => {
+    const count = effectiveDormerCount(cfg);
+    const widths = count === 2 ? cfg.dormerWidths : cfg.dormerWidths.slice(0, count);
+    widths.forEach((w, i) => {
       if (!w) return;
-      const peak = cfg.dormerWallFt + (w / 2) * (cfg.pitch / 12);
+      const peak = cfg.dormerStyle === "shed"
+        ? cfg.dormerWallFt + DORMER_SHED_CAP_FT
+        : cfg.dormerWallFt + (w / 2) * (cfg.pitch / 12);
       const clear = ridgeFt - peak;
       out.push({
         ok: clear >= 1.5,
@@ -489,6 +569,10 @@ const FIELDS_DORMERS = [
   ["dormer0", "Dormer 1 (ft)", 0, 20, 1],
   ["dormer1", "Dormer 2 (ft)", 0, 20, 1],
   ["dormerWallFt", "Dormer wall (ft)", 2, 8, 0.5]
+];
+const FIELDS_DORMER_POSITION = [
+  ["dormerOffsetFt", "Dormer offset (ft)", 0, 20, 0.5],
+  ["dormerEdgeMarginFt", "Dormer edge margin (ft)", 0, 8, 0.5]
 ];
 const FIELDS_STAIRS = [
   ["stairWidthFt", "Stair width (ft)", 3, 8, 0.5]
@@ -580,6 +664,54 @@ function buildDoorHeightSelect() {
   host.appendChild(l);
 }
 
+let dormerCountSelect = null;
+
+function buildDormerCountSelect() {
+  const host = document.getElementById("ctlDoors");
+  const l = document.createElement("label");
+  l.innerHTML = `<span>Dormers</span>`;
+  const sel = document.createElement("select");
+  sel.innerHTML = `<option value="0">None</option><option value="1">One</option><option value="2">Two, over doors</option>`;
+  sel.value = String(CONFIG.dormerCount);
+  sel.addEventListener("change", () => { CONFIG.dormerCount = parseInt(sel.value, 10); render(); });
+  l.appendChild(sel);
+  host.appendChild(l);
+  dormerCountSelect = sel;
+}
+
+function refreshDormerCountSelect() {
+  if (!dormerCountSelect) return;
+  const twoDoorsOK = CONFIG.doorWidths.length === 2;
+  const twoOption = dormerCountSelect.querySelector('option[value="2"]');
+  twoOption.disabled = !twoDoorsOK;
+  if (!twoDoorsOK && CONFIG.dormerCount === 2) CONFIG.dormerCount = 1;
+  dormerCountSelect.value = String(CONFIG.dormerCount);
+}
+
+function buildDormerStyleSelect() {
+  const host = document.getElementById("ctlDoors");
+  const l = document.createElement("label");
+  l.innerHTML = `<span>Dormer style</span>`;
+  const sel = document.createElement("select");
+  sel.innerHTML = `<option value="gable">Gable</option><option value="shed">Shed</option>`;
+  sel.value = CONFIG.dormerStyle;
+  sel.addEventListener("change", () => { CONFIG.dormerStyle = sel.value; render(); });
+  l.appendChild(sel);
+  host.appendChild(l);
+}
+
+function buildDormerPositionSelect() {
+  const host = document.getElementById("ctlDoors");
+  const l = document.createElement("label");
+  l.innerHTML = `<span>Dormer position</span>`;
+  const sel = document.createElement("select");
+  sel.innerHTML = `<option value="left">Left</option><option value="center">Center</option><option value="right">Right</option>`;
+  sel.value = CONFIG.dormerPosition;
+  sel.addEventListener("change", () => { CONFIG.dormerPosition = sel.value; render(); });
+  l.appendChild(sel);
+  host.appendChild(l);
+}
+
 function buildToggle(hostId, key, label) {
   const host = document.getElementById(hostId);
   const l = document.createElement("label");
@@ -614,6 +746,11 @@ const SHARE_SCHEMA = {
   curbInches:     { code: "ci",  type: "num" },
   overhangInches: { code: "oh",  type: "num" },
   showDormers:    { code: "sd",  type: "bool" },
+  dormerStyle:    { code: "dst", type: "str" },
+  dormerCount:    { code: "dc",  type: "num" },
+  dormerPosition: { code: "dp",  type: "str" },
+  dormerOffsetFt: { code: "dof", type: "num" },
+  dormerEdgeMarginFt: { code: "dem", type: "num" },
   dormerWidths:   { code: "dmw", type: "numArr" },
   dormerWallFt:   { code: "dwf", type: "num" },
   showStairs:     { code: "ss",  type: "bool" },
@@ -629,6 +766,8 @@ const COLOR_KEYS = COLOR_ROLES.map(([k]) => k);
 const share = createShareLink(CONFIG, SHARE_SCHEMA, COLOR_KEYS);
 
 function render() {
+  refreshDormerCountSelect();
+
   // checks
   const cs = document.getElementById("checks");
   cs.innerHTML = runChecks(CONFIG).map(c =>
@@ -682,7 +821,11 @@ buildSwapDoorsButton();
 insertFieldGroup("ctlDoors", "Framing");
 buildControls("ctlDoors", FIELDS_FRAMING);
 insertFieldGroup("ctlDoors", "Dormers");
+buildDormerCountSelect();
+buildDormerStyleSelect();
+buildDormerPositionSelect();
 buildControls("ctlDoors", FIELDS_DORMERS);
+buildControls("ctlDoors", FIELDS_DORMER_POSITION);
 buildSwapDormersButton();
 buildToggle("ctlDoors", "showDormers", "Dormers");
 insertFieldGroup("ctlDoors", "Stairs");

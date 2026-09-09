@@ -42,6 +42,7 @@
   <div class="panel tabpanel" id="tabAppearance">
     <div class="grid" id="ctlAppearance"></div>
     <div class="swatches" id="ctlColors"></div>
+    <div class="grid" id="ctlDormerAppearance"></div>
   </div>
 
   <div class="panel tabpanel" id="tabChecks">
@@ -994,8 +995,8 @@ buildToggle("ctlStairs", "switchbackFlip", "Lower flight outside");
 buildToggle("ctlStairs", "showStairs", "Stairs");
 
 function buildDormerAppearanceSection() {
-  insertFieldGroup("ctlAppearance", "Dormers");
-  buildToggle("ctlAppearance", "dormerMatchSiding", "Match main siding");
+  insertFieldGroup("ctlDormerAppearance", "Dormers");
+  buildToggle("ctlDormerAppearance", "dormerMatchSiding", "Match main siding");
 
   const sidingLabel = document.createElement("label");
   sidingLabel.innerHTML = `<span>Dormer siding type</span>`;
@@ -1004,10 +1005,11 @@ function buildDormerAppearanceSection() {
   sidingSel.value = CONFIG.dormerSiding;
   sidingSel.addEventListener("change", () => { CONFIG.dormerSiding = sidingSel.value; render(); });
   sidingLabel.appendChild(sidingSel);
-  document.getElementById("ctlAppearance").appendChild(sidingLabel);
+  document.getElementById("ctlDormerAppearance").appendChild(sidingLabel);
 
   const swatchRow = document.createElement("div");
   swatchRow.className = "swatches";
+  swatchRow.style.gridColumn = "1 / -1"; // its own line, full width, below the selects above
   [["dormerBodyColor", "Dormer body"], ["dormerBattenColor", "Dormer batten"]].forEach(([key, label]) => {
     const l = document.createElement("label");
     l.className = "swatch";
@@ -1019,7 +1021,7 @@ function buildDormerAppearanceSection() {
     l.appendChild(inp);
     swatchRow.appendChild(l);
   });
-  document.getElementById("ctlAppearance").appendChild(swatchRow);
+  document.getElementById("ctlDormerAppearance").appendChild(swatchRow);
 }
 
 buildAppearanceSection({

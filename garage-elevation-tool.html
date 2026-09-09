@@ -22,6 +22,7 @@
   <div class="tabbar">
     <button type="button" class="active" data-tab="tabBuilding">Building</button>
     <button type="button" data-tab="tabDoors">Doors &amp; dormers</button>
+    <button type="button" data-tab="tabStairs">Stairs</button>
     <button type="button" data-tab="tabAppearance">Appearance</button>
     <button type="button" data-tab="tabChecks">Checks</button>
   </div>
@@ -32,6 +33,10 @@
 
   <div class="panel tabpanel" id="tabDoors">
     <div class="grid" id="ctlDoors"></div>
+  </div>
+
+  <div class="panel tabpanel" id="tabStairs">
+    <div class="grid" id="ctlStairs"></div>
   </div>
 
   <div class="panel tabpanel" id="tabAppearance">
@@ -78,9 +83,12 @@ const CONFIG = {
   dormerWallFt:   3.5,    // face wall height below the dormer gable
 
   showStairs:     true,
+  stairStyle:     "straight", // "straight" | "switchback"
   stairWidthFt:   4,
   riserInches:    7,
   treadInches:    11,
+  lowerFlightSteps: 8,   // switchback only: steps in the lower (ground) flight; the rest go in the upper flight
+  stairFlightGapFt: 2.5, // switchback only: horizontal gap between the two flights, under the landing
 
   showHouse:      true,
   houseGapFt:     13,     // garage wall to house wall
@@ -164,12 +172,15 @@ function geometry(cfg) {
   });
 
   const stairW = ft(cfg.stairWidthFt);
-  const stairCx = x1 + ft(0.5) + stairW / 2;
+  const stairFootprintW = cfg.stairStyle === "switchback"
+    ? stairW * 2 + ft(cfg.stairFlightGapFt)
+    : stairW;
+  const stairCx = x1 + ft(0.5) + stairFootprintW / 2;
   const houseX = x1 + ft(cfg.houseGapFt);
-  const W = cfg.showHouse ? houseX + 96 : Math.max(x1 + ft(2), stairCx + stairW) + 40;
+  const W = cfg.showHouse ? houseX + 96 : Math.max(x1 + ft(2), stairCx + stairFootprintW / 2) + 40;
 
   return { S, ft, inch, x0, x1, wallW, wallH, ridgeRise, fascia, OH, curb,
-           ridgeY, eaveY, wallTopY, groundY, doors, stairCx, stairW, houseX, W, H };
+           ridgeY, eaveY, wallTopY, groundY, doors, stairCx, stairW, stairFootprintW, houseX, W, H };
 }
 
 /* ===================================================================
@@ -335,19 +346,16 @@ function drawDormer(cx, widthFt, g, cfg, uid) {
   return cfg.dormerStyle === "shed" ? shedDormer(cx, widthFt, g, cfg, uid) : dormer(cx, widthFt, g, cfg, uid);
 }
 
-/* exterior stair running front-to-back along the gable wall, drawn straight
-   on (no perspective taper) so it stays inline with the garage side wall. */
-function stairs(g, cfg) {
-  const rise = g.groundY - g.wallTopY;
-  const n = Math.max(2, Math.round(g.ft(cfg.wallHeightFt) / g.inch(cfg.riserInches)));
-  const stepH = rise / n;
-  const w = g.ft(cfg.stairWidthFt);
-  const cx = g.stairCx, RH = g.ft(2.6);
+/* one straight flight of n steps, its top tread sitting at topY, stacked
+   straight on (no perspective taper) the way the whole stair is drawn. */
+function stairFlight(cx, w, n, stepH, topY, g) {
+  const bottomY = topY + n * stepH;
+  const RH = g.ft(2.6);
 
-  let s = rect(cx - w / 2 - 5, g.groundY - 3, w + 10, 5, "rgba(0,0,0,0.16)");
+  let s = rect(cx - w / 2 - 5, bottomY - 3, w + 10, 5, "rgba(0,0,0,0.16)");
 
   for (let i = 0; i < n; i++) {
-    const y = g.groundY - i * stepH;
+    const y = bottomY - i * stepH;
     s += rect(cx - w / 2, y - stepH, w, stepH, "var(--riser)");
     s += rect(cx - w / 2, y - stepH, w, Math.min(g.inch(2), stepH), "var(--tread)");
     s += rect(cx - w / 2, y - stepH, w, 2.2, "rgba(255,255,255,0.15)");
@@ -355,15 +363,47 @@ function stairs(g, cfg) {
   }
 
   [-1, 1].forEach(k => {
-    s += rect(cx + k * (w / 2) - (k > 0 ? 0 : 7), g.wallTopY, 7, g.groundY - g.wallTopY, "var(--trim)");
+    s += rect(cx + k * (w / 2) - (k > 0 ? 0 : 7), topY, 7, bottomY - topY, "var(--trim)");
     for (let p = 0; p <= n; p += 5) {
-      const px = cx + k * (w / 2 + 3.5), py = g.groundY - p * stepH;
+      const px = cx + k * (w / 2 + 3.5), py = bottomY - p * stepH;
       s += rect(px - 1.7, py - RH, 3.4, RH, "var(--trim)");
     }
-    s += rect(cx + k * (w / 2 + 1) - (k > 0 ? 0 : 6), g.wallTopY - RH, 6, g.groundY - g.wallTopY, "var(--trim)");
+    s += rect(cx + k * (w / 2 + 1) - (k > 0 ? 0 : 6), topY - RH, 6, bottomY - topY, "var(--trim)");
   });
 
-  s += rect(cx - w / 2 - 6, g.wallTopY - 3, w + 12, 5, "var(--trim)");
+  s += rect(cx - w / 2 - 6, topY - 3, w + 12, 5, "var(--trim)");
+  return s;
+}
+
+/* exterior stair running front-to-back along the gable wall, drawn straight
+   on (no perspective taper) so it stays inline with the garage side wall.
+   "switchback" splits the run into two flights side by side around a
+   landing, folding the total depth the stair needs roughly in half. */
+function stairs(g, cfg) {
+  const rise = g.groundY - g.wallTopY;
+  const n = Math.max(2, Math.round(g.ft(cfg.wallHeightFt) / g.inch(cfg.riserInches)));
+  const stepH = rise / n;
+  const w = g.ft(cfg.stairWidthFt);
+
+  if (cfg.stairStyle !== "switchback") {
+    return stairFlight(g.stairCx, w, n, stepH, g.wallTopY, g);
+  }
+
+  const lowerN = Math.min(Math.max(Math.round(cfg.lowerFlightSteps), 1), n - 1);
+  const upperN = n - lowerN;
+  const gap = g.ft(cfg.stairFlightGapFt);
+  const cx1 = g.stairCx - (gap / 2 + w / 2);
+  const cx2 = g.stairCx + (gap / 2 + w / 2);
+  const landingY = g.groundY - lowerN * stepH;
+
+  let s = stairFlight(cx1, w, lowerN, stepH, landingY, g);
+  s += stairFlight(cx2, w, upperN, stepH, g.wallTopY, g);
+
+  // landing deck bridging the two flights, plus a solid knee wall filling
+  // the gap underneath it down to grade
+  s += rect(cx1 + w / 2, landingY, gap, g.groundY - landingY, "var(--riser)");
+  s += rect(cx1 - w / 2, landingY - 3, (cx2 + w / 2) - (cx1 - w / 2), 5, "var(--trim)");
+  s += rect(cx1 + w / 2, landingY - Math.min(g.inch(2), stepH), gap, Math.min(g.inch(2), stepH), "var(--tread)");
   return s;
 }
 
@@ -526,12 +566,23 @@ function runChecks(cfg) {
   // stair run against the depth available
   if (cfg.showStairs) {
     const risers = Math.round((cfg.wallHeightFt * 12) / cfg.riserInches);
-    const run = risers * cfg.treadInches / 12;
-    out.push({
-      ok: run <= cfg.depthFt - 3,
-      label: `Stair run (${risers} risers)`,
-      value: `${run.toFixed(1)}' in ${cfg.depthFt}'`
-    });
+    if (cfg.stairStyle === "switchback") {
+      const lowerN = Math.min(Math.max(Math.round(cfg.lowerFlightSteps), 1), risers - 1);
+      const longFlight = Math.max(lowerN, risers - lowerN);
+      const run = longFlight * cfg.treadInches / 12 + cfg.stairFlightGapFt;
+      out.push({
+        ok: run <= cfg.depthFt - 3,
+        label: `Stair run (${risers} risers, switchback)`,
+        value: `${run.toFixed(1)}' in ${cfg.depthFt}'`
+      });
+    } else {
+      const run = risers * cfg.treadInches / 12;
+      out.push({
+        ok: run <= cfg.depthFt - 3,
+        label: `Stair run (${risers} risers)`,
+        value: `${run.toFixed(1)}' in ${cfg.depthFt}'`
+      });
+    }
   }
 
   return out;
@@ -575,7 +626,13 @@ const FIELDS_DORMER_POSITION = [
   ["dormerEdgeMarginFt", "Dormer edge margin (ft)", 0, 8, 0.5]
 ];
 const FIELDS_STAIRS = [
-  ["stairWidthFt", "Stair width (ft)", 3, 8, 0.5]
+  ["stairWidthFt", "Stair width (ft)", 3, 8, 0.5],
+  ["riserInches", "Riser height (in)", 5, 8, 0.25],
+  ["treadInches", "Tread run (in)", 9, 14, 0.5]
+];
+const FIELDS_STAIRS_SWITCHBACK = [
+  ["lowerFlightSteps", "Lower flight steps", 1, 30, 1],
+  ["stairFlightGapFt", "Flight gap (ft)", 1, 6, 0.5]
 ];
 
 function readVirtual(key) {
@@ -700,6 +757,18 @@ function buildDormerStyleSelect() {
   host.appendChild(l);
 }
 
+function buildStairStyleSelect() {
+  const host = document.getElementById("ctlStairs");
+  const l = document.createElement("label");
+  l.innerHTML = `<span>Stair style</span>`;
+  const sel = document.createElement("select");
+  sel.innerHTML = `<option value="straight">Straight</option><option value="switchback">Switchback</option>`;
+  sel.value = CONFIG.stairStyle;
+  sel.addEventListener("change", () => { CONFIG.stairStyle = sel.value; render(); });
+  l.appendChild(sel);
+  host.appendChild(l);
+}
+
 function buildDormerPositionSelect() {
   const host = document.getElementById("ctlDoors");
   const l = document.createElement("label");
@@ -754,8 +823,12 @@ const SHARE_SCHEMA = {
   dormerWidths:   { code: "dmw", type: "numArr" },
   dormerWallFt:   { code: "dwf", type: "num" },
   showStairs:     { code: "ss",  type: "bool" },
+  stairStyle:     { code: "sst", type: "str" },
   stairWidthFt:   { code: "sw",  type: "num" },
   riserInches:    { code: "ri",  type: "num" },
+  treadInches:    { code: "ti",  type: "num" },
+  lowerFlightSteps: { code: "lfs", type: "num" },
+  stairFlightGapFt: { code: "sfg", type: "num" },
   showHouse:      { code: "sh",  type: "bool" },
   houseGapFt:     { code: "hg",  type: "num" },
   pxPerFt:        { code: "px",  type: "num" },
@@ -828,11 +901,15 @@ buildControls("ctlDoors", FIELDS_DORMERS);
 buildControls("ctlDoors", FIELDS_DORMER_POSITION);
 buildSwapDormersButton();
 buildToggle("ctlDoors", "showDormers", "Dormers");
-insertFieldGroup("ctlDoors", "Stairs");
-buildControls("ctlDoors", FIELDS_STAIRS);
-buildToggle("ctlDoors", "showStairs", "Stairs");
 insertFieldGroup("ctlDoors", "Site");
 buildToggle("ctlDoors", "showHouse", "Show house");
+
+insertFieldGroup("ctlStairs", "Stairs");
+buildStairStyleSelect();
+buildControls("ctlStairs", FIELDS_STAIRS);
+insertFieldGroup("ctlStairs", "Switchback");
+buildControls("ctlStairs", FIELDS_STAIRS_SWITCHBACK);
+buildToggle("ctlStairs", "showStairs", "Stairs");
 
 buildAppearanceSection({
   paletteHostId: "ctlAppearance",

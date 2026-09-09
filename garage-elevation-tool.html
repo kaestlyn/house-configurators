@@ -75,11 +75,13 @@ const CONFIG = {
 
   showDormers:    true,
   dormerStyle:    "gable", // "gable" | "shed"
-  dormerCount:    2,      // 0, 1, or 2 — 2 only takes effect with exactly 2 doors
+  dormerCount:    2,      // 0, 1, or 2
+  dormerTiedToDoors: true, // 2 only: true centers over each door (needs exactly 2 doors);
+                           // false places both independently, using the position controls
   dormerPosition: "center", // "left" | "center" | "right" — used when dormerCount is 1
   dormerOffsetFt: 0,      // left/right only: distance in from the margin-clamped edge position
   dormerEdgeMarginFt: 2,  // left/right only: minimum clearance from the roof edge
-  dormerWidths: [5, 10],  // one per door when dormerCount is 2; dormerWidths[0] when it's 1
+  dormerWidths: [5, 10],  // one per dormer when dormerCount is 2; dormerWidths[0] when it's 1
   dormerWallFt:   3.5,    // face wall height below the dormer gable
 
   showStairs:     true,
@@ -464,11 +466,26 @@ function stairs(g, cfg) {
   return s;
 }
 
-/* dormerCount as actually usable: 2 requires exactly 2 doors to anchor to,
-   otherwise it falls back to a single positioned dormer. */
+/* dormerCount as actually usable. 2 tied-to-doors requires exactly 2 doors
+   to anchor to, falling back to a single positioned dormer otherwise; 2
+   independent always works, since it doesn't need doors to anchor to. */
 function effectiveDormerCount(cfg) {
-  if (cfg.dormerCount === 2 && cfg.doorWidths.length === 2) return 2;
+  if (cfg.dormerCount === 2) {
+    if (!cfg.dormerTiedToDoors) return 2;
+    return cfg.doorWidths.length === 2 ? 2 : 1;
+  }
   return Math.min(cfg.dormerCount, 1);
+}
+
+/* x-center for one positioned dormer: "left"/"right" sit at the
+   margin-clamped edge plus an inward offset, "center" sits at roof center. */
+function dormerPositionX(side, widthFt, RL, RR, g, cfg) {
+  const hw = g.ft(widthFt) / 2;
+  const center = (RL + RR) / 2;
+  const inset = g.ft(cfg.dormerEdgeMarginFt) + hw;
+  if (side === "left") return Math.min(RL + inset + g.ft(cfg.dormerOffsetFt), center);
+  if (side === "right") return Math.max(RR - inset - g.ft(cfg.dormerOffsetFt), center);
+  return center;
 }
 
 /* ===================================================================
@@ -511,31 +528,23 @@ function drawGarage(cfg, uid) {
   s += rect(RL, g.ridgeY - 6, RR - RL, 8, "var(--roof)");
   s += rect(RL, g.ridgeY - 6, RR - RL, 1.8, "rgba(255,255,255,0.10)");
 
-  // dormers — 2 centers one over each door (only when there are exactly 2
-  // doors to anchor to), otherwise a single dormer positioned left/center/right
+  // dormers — 2 tied-to-doors centers one over each door; 2 independent
+  // places both using the same left/right position controls as a single
+  // dormer, one on each side; 1 uses those controls for just one dormer
   if (cfg.showDormers) {
     const count = effectiveDormerCount(cfg);
-    if (count === 2) {
+    if (count === 2 && cfg.dormerTiedToDoors) {
       g.doors.forEach((d, i) => {
         const w = cfg.dormerWidths[i];
         if (w > 0) s += drawDormer((d[0] + d[1]) / 2, w, g, cfg, uid);
       });
+    } else if (count === 2) {
+      const w0 = cfg.dormerWidths[0], w1 = cfg.dormerWidths[1];
+      if (w0 > 0) s += drawDormer(dormerPositionX("left", w0, RL, RR, g, cfg), w0, g, cfg, uid);
+      if (w1 > 0) s += drawDormer(dormerPositionX("right", w1, RL, RR, g, cfg), w1, g, cfg, uid);
     } else if (count === 1) {
       const w = cfg.dormerWidths[0];
-      if (w > 0) {
-        const hw = g.ft(w) / 2;
-        const center = (RL + RR) / 2;
-        const inset = g.ft(cfg.dormerEdgeMarginFt) + hw;
-        let cx = center;
-        if (cfg.dormerPosition === "left") {
-          const edgeCx = RL + inset;
-          cx = Math.min(edgeCx + g.ft(cfg.dormerOffsetFt), center);
-        } else if (cfg.dormerPosition === "right") {
-          const edgeCx = RR - inset;
-          cx = Math.max(edgeCx - g.ft(cfg.dormerOffsetFt), center);
-        }
-        s += drawDormer(cx, w, g, cfg, uid);
-      }
+      if (w > 0) s += drawDormer(dormerPositionX(cfg.dormerPosition, w, RL, RR, g, cfg), w, g, cfg, uid);
     }
   }
 
@@ -784,7 +793,7 @@ function buildDormerCountSelect() {
   const l = document.createElement("label");
   l.innerHTML = `<span>Dormers</span>`;
   const sel = document.createElement("select");
-  sel.innerHTML = `<option value="0">None</option><option value="1">One</option><option value="2">Two, over doors</option>`;
+  sel.innerHTML = `<option value="0">None</option><option value="1">One</option><option value="2">Two</option>`;
   sel.value = String(CONFIG.dormerCount);
   sel.addEventListener("change", () => { CONFIG.dormerCount = parseInt(sel.value, 10); render(); });
   l.appendChild(sel);
@@ -794,10 +803,6 @@ function buildDormerCountSelect() {
 
 function refreshDormerCountSelect() {
   if (!dormerCountSelect) return;
-  const twoDoorsOK = CONFIG.doorWidths.length === 2;
-  const twoOption = dormerCountSelect.querySelector('option[value="2"]');
-  twoOption.disabled = !twoDoorsOK;
-  if (!twoDoorsOK && CONFIG.dormerCount === 2) CONFIG.dormerCount = 1;
   dormerCountSelect.value = String(CONFIG.dormerCount);
 }
 
@@ -873,6 +878,7 @@ const SHARE_SCHEMA = {
   showDormers:    { code: "sd",  type: "bool" },
   dormerStyle:    { code: "dst", type: "str" },
   dormerCount:    { code: "dc",  type: "num" },
+  dormerTiedToDoors: { code: "dtd", type: "bool" },
   dormerPosition: { code: "dp",  type: "str" },
   dormerOffsetFt: { code: "dof", type: "num" },
   dormerEdgeMarginFt: { code: "dem", type: "num" },
@@ -956,6 +962,7 @@ buildDormerPositionSelect();
 buildControls("ctlDoors", FIELDS_DORMERS);
 buildControls("ctlDoors", FIELDS_DORMER_POSITION);
 buildSwapDormersButton();
+buildToggle("ctlDoors", "dormerTiedToDoors", "Tie 2 dormers to doors");
 buildToggle("ctlDoors", "showDormers", "Dormers");
 insertFieldGroup("ctlDoors", "Site");
 buildToggle("ctlDoors", "showHouse", "Show house");

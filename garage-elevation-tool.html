@@ -88,7 +88,7 @@ const CONFIG = {
   riserInches:    7,
   treadInches:    11,
   lowerFlightSteps: 8,   // switchback only: steps in the lower (ground) flight; the rest go in the upper flight
-  stairFlightGapFt: 2.5, // switchback only: horizontal gap between the two flights, under the landing
+  switchbackFlip: false, // switchback only: true puts the lower flight on the outside, upper flight nearer the wall
 
   showHouse:      true,
   houseGapFt:     13,     // garage wall to house wall
@@ -172,9 +172,8 @@ function geometry(cfg) {
   });
 
   const stairW = ft(cfg.stairWidthFt);
-  const stairFootprintW = cfg.stairStyle === "switchback"
-    ? stairW * 2 + ft(cfg.stairFlightGapFt)
-    : stairW;
+  // switchback flight gap is always the minimum: a landing as deep as the stair is wide
+  const stairFootprintW = cfg.stairStyle === "switchback" ? stairW * 3 : stairW;
   const stairCx = x1 + ft(0.5) + stairFootprintW / 2;
   const houseX = x1 + ft(cfg.houseGapFt);
   const W = cfg.showHouse ? houseX + 96 : Math.max(x1 + ft(2), stairCx + stairFootprintW / 2) + 40;
@@ -375,35 +374,77 @@ function stairFlight(cx, w, n, stepH, topY, g) {
   return s;
 }
 
+/* deck bridging a gap at a fixed height — used to carry the top of the
+   stair over to the wall it's climbing toward, and (for the switchback)
+   between its two flights. Filled below with a solid knee wall down to
+   grade rather than open framing, matching the rest of the stair's style. */
+function stairDeck(xLeft, xRight, y, thick, g) {
+  const width = xRight - xLeft;
+  if (width <= 0.5) return "";
+  let s = rect(xLeft, y, width, g.groundY - y, "var(--riser)");
+  s += rect(xLeft, y - 3, width, 5, "var(--trim)");
+  s += rect(xLeft, y - thick, width, thick, "var(--tread)");
+  return s;
+}
+
+/* a walkway carrying the stair over to the wall — like stairDeck, but on
+   posts rather than a solid wall, since (with the flights flipped) it may
+   run over the top of the other flight rather than open ground. */
+function stairWalkway(xLeft, xRight, y, thick, g) {
+  const width = xRight - xLeft;
+  if (width <= 0.5) return "";
+  let s = rect(xLeft, y - 3, width, 5, "var(--trim)");
+  s += rect(xLeft, y - thick, width, thick, "var(--tread)");
+  const postGap = g.ft(4);
+  for (let x = xLeft + postGap / 2; x < xRight; x += postGap) {
+    s += rect(x - 3, y, 6, g.groundY - y, "var(--trim)");
+  }
+  return s;
+}
+
 /* exterior stair running front-to-back along the gable wall, drawn straight
    on (no perspective taper) so it stays inline with the garage side wall.
    "switchback" splits the run into two flights side by side around a
-   landing, folding the total depth the stair needs roughly in half. */
+   landing, folding the total depth the stair needs roughly in half. Its
+   flight gap is always the code-minimum: a landing as deep as the stair
+   is wide. switchbackFlip swaps which flight sits nearer the wall. */
 function stairs(g, cfg) {
   const rise = g.groundY - g.wallTopY;
   const n = Math.max(2, Math.round(g.ft(cfg.wallHeightFt) / g.inch(cfg.riserInches)));
   const stepH = rise / n;
   const w = g.ft(cfg.stairWidthFt);
+  const treadCap = Math.min(g.inch(2), stepH);
 
   if (cfg.stairStyle !== "switchback") {
-    return stairFlight(g.stairCx, w, n, stepH, g.wallTopY, g);
+    let s = stairFlight(g.stairCx, w, n, stepH, g.wallTopY, g);
+    s += stairWalkway(g.x1, g.stairCx - w / 2, g.wallTopY, treadCap, g);
+    return s;
   }
 
   const lowerN = Math.min(Math.max(Math.round(cfg.lowerFlightSteps), 1), n - 1);
   const upperN = n - lowerN;
-  const gap = g.ft(cfg.stairFlightGapFt);
-  const cx1 = g.stairCx - (gap / 2 + w / 2);
-  const cx2 = g.stairCx + (gap / 2 + w / 2);
+  const gap = w; // minimum: landing as deep as the stair is wide
+  const insideCx = g.stairCx - (gap / 2 + w / 2);   // nearer the wall
+  const outsideCx = g.stairCx + (gap / 2 + w / 2);  // farther from the wall
+  const lowerCx = cfg.switchbackFlip ? outsideCx : insideCx;
+  const upperCx = cfg.switchbackFlip ? insideCx : outsideCx;
   const landingY = g.groundY - lowerN * stepH;
 
-  let s = stairFlight(cx1, w, lowerN, stepH, landingY, g);
-  s += stairFlight(cx2, w, upperN, stepH, g.wallTopY, g);
+  let s = stairFlight(lowerCx, w, lowerN, stepH, landingY, g);
+  s += stairFlight(upperCx, w, upperN, stepH, g.wallTopY, g);
 
   // landing deck bridging the two flights, plus a solid knee wall filling
   // the gap underneath it down to grade
-  s += rect(cx1 + w / 2, landingY, gap, g.groundY - landingY, "var(--riser)");
-  s += rect(cx1 - w / 2, landingY - 3, (cx2 + w / 2) - (cx1 - w / 2), 5, "var(--trim)");
-  s += rect(cx1 + w / 2, landingY - Math.min(g.inch(2), stepH), gap, Math.min(g.inch(2), stepH), "var(--tread)");
+  const landLeft = Math.min(lowerCx, upperCx) + w / 2;
+  const landRight = Math.max(lowerCx, upperCx) - w / 2;
+  s += stairDeck(landLeft, landRight, landingY, treadCap, g);
+  s += rect(Math.min(lowerCx, upperCx) - w / 2, landingY - 3,
+            (Math.max(lowerCx, upperCx) + w / 2) - (Math.min(lowerCx, upperCx) - w / 2), 5, "var(--trim)");
+
+  // top landing carrying the stair over to the wall it climbs toward — a
+  // walkway rather than a solid deck, since when the upper flight sits on
+  // the outside this runs over the top of the lower flight below it
+  s += stairWalkway(g.x1, upperCx - w / 2, g.wallTopY, treadCap, g);
   return s;
 }
 
@@ -569,7 +610,7 @@ function runChecks(cfg) {
     if (cfg.stairStyle === "switchback") {
       const lowerN = Math.min(Math.max(Math.round(cfg.lowerFlightSteps), 1), risers - 1);
       const longFlight = Math.max(lowerN, risers - lowerN);
-      const run = longFlight * cfg.treadInches / 12 + cfg.stairFlightGapFt;
+      const run = longFlight * cfg.treadInches / 12 + cfg.stairWidthFt;
       out.push({
         ok: run <= cfg.depthFt - 3,
         label: `Stair run (${risers} risers, switchback)`,
@@ -631,8 +672,7 @@ const FIELDS_STAIRS = [
   ["treadInches", "Tread run (in)", 9, 14, 0.5]
 ];
 const FIELDS_STAIRS_SWITCHBACK = [
-  ["lowerFlightSteps", "Lower flight steps", 1, 30, 1],
-  ["stairFlightGapFt", "Flight gap (ft)", 1, 6, 0.5]
+  ["lowerFlightSteps", "Lower flight steps", 1, 30, 1]
 ];
 
 function readVirtual(key) {
@@ -828,7 +868,7 @@ const SHARE_SCHEMA = {
   riserInches:    { code: "ri",  type: "num" },
   treadInches:    { code: "ti",  type: "num" },
   lowerFlightSteps: { code: "lfs", type: "num" },
-  stairFlightGapFt: { code: "sfg", type: "num" },
+  switchbackFlip: { code: "sbf", type: "bool" },
   showHouse:      { code: "sh",  type: "bool" },
   houseGapFt:     { code: "hg",  type: "num" },
   pxPerFt:        { code: "px",  type: "num" },
@@ -909,6 +949,7 @@ buildStairStyleSelect();
 buildControls("ctlStairs", FIELDS_STAIRS);
 insertFieldGroup("ctlStairs", "Switchback");
 buildControls("ctlStairs", FIELDS_STAIRS_SWITCHBACK);
+buildToggle("ctlStairs", "switchbackFlip", "Lower flight outside");
 buildToggle("ctlStairs", "showStairs", "Stairs");
 
 buildAppearanceSection({

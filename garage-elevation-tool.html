@@ -1007,18 +1007,52 @@ function buildDormerAppearanceSection() {
   sidingLabel.appendChild(sidingSel);
   document.getElementById("ctlDormerAppearance").appendChild(sidingLabel);
 
+  // same swatch control as the main colors (color input + "copy from"),
+  // just a narrower row of its own rather than stretching full width
+  const roles = [
+    { key: "dormerBodyColor", label: "Dormer body" },
+    { key: "dormerBattenColor", label: "Dormer batten" }
+  ];
+  const copySources = [
+    ...roles,
+    { key: "__body",   label: "Siding body",          get: () => CONFIG.colors.body },
+    { key: "__batten", label: "Batten / lap accent",   get: () => CONFIG.colors.batten }
+  ];
+
   const swatchRow = document.createElement("div");
   swatchRow.className = "swatches";
-  swatchRow.style.gridColumn = "1 / -1"; // its own line, full width, below the selects above
-  [["dormerBodyColor", "Dormer body"], ["dormerBattenColor", "Dormer batten"]].forEach(([key, label]) => {
+  swatchRow.style.gridColumn = "1 / -1";           // its own line, below the selects above
+  swatchRow.style.gridTemplateColumns = "none";    // ...but flex, not grid, so it doesn't stretch to fill it
+  swatchRow.style.display = "flex";
+  swatchRow.style.flexWrap = "wrap";
+
+  roles.forEach(({ key, label }) => {
     const l = document.createElement("label");
     l.className = "swatch";
+    l.style.maxWidth = "150px";
     l.innerHTML = `<span>${label}</span>`;
     const inp = document.createElement("input");
     inp.type = "color";
     inp.value = CONFIG[key];
     inp.addEventListener("input", () => { CONFIG[key] = inp.value; render(); });
     l.appendChild(inp);
+
+    const copy = document.createElement("select");
+    copy.className = "copyfrom";
+    copy.innerHTML = `<option value="">Copy from…</option>` +
+      copySources.filter(s => s.key !== key)
+        .map(s => `<option value="${s.key}">${s.label}</option>`).join("");
+    copy.addEventListener("change", () => {
+      if (!copy.value) return;
+      const src = copySources.find(s => s.key === copy.value);
+      const val = src.get ? src.get() : CONFIG[src.key];
+      CONFIG[key] = val;
+      inp.value = val;
+      copy.value = "";
+      render();
+    });
+    l.appendChild(copy);
+
     swatchRow.appendChild(l);
   });
   document.getElementById("ctlDormerAppearance").appendChild(swatchRow);

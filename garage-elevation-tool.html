@@ -446,12 +446,12 @@ function stairs(g, cfg) {
   // the outside this runs over the top of the lower flight below it
   s += stairWalkway(g.x1, upperCx - w / 2, g.wallTopY, treadCap, g);
 
-  // full-height posts at the two outer extremes of the whole structure:
-  // the wall-facing edge of the inside flight, and the outside edge of the
-  // outside flight — the same spots the flights' own corner posts already
-  // mark, just carried the full height instead of only their own flight's
+  // full-height posts at the wall-facing edge and at the shared boundary
+  // between the two flights — the same spots the flights' own corner posts
+  // already mark, just carried the full height instead of only their own
+  // flight's, rather than a new post out at the far outside edge
   s += stairSupportPost(insideCx - w / 2, g);
-  s += stairSupportPost(outsideCx + w / 2, g);
+  s += stairSupportPost(g.stairCx, g);
   return s;
 }
 

@@ -172,8 +172,10 @@ function geometry(cfg) {
   });
 
   const stairW = ft(cfg.stairWidthFt);
-  // switchback flight gap is always the minimum: a landing as deep as the stair is wide
-  const stairFootprintW = cfg.stairStyle === "switchback" ? stairW * 3 : stairW;
+  // switchback flights sit as close together as the rail posts allow
+  const stairFootprintW = cfg.stairStyle === "switchback"
+    ? stairW * 2 + ft(STAIR_RAIL_GAP_FT)
+    : stairW;
   const stairCx = x1 + ft(0.5) + stairFootprintW / 2;
   const houseX = x1 + ft(cfg.houseGapFt);
   const W = cfg.showHouse ? houseX + 96 : Math.max(x1 + ft(2), stairCx + stairFootprintW / 2) + 40;
@@ -268,6 +270,10 @@ function overheadDoor(a, b, g, cfg) {
 // front-to-back, not side-to-side) reads as a flat cap of this height
 // rather than a triangular peak — there's no ridge line to draw in elevation.
 const DORMER_SHED_CAP_FT = 1.3;
+
+// switchback flights sit as close together as possible, but still need
+// this much clearance between them or their inner handrail posts collide
+const STAIR_RAIL_GAP_FT = 1;
 
 /* gable dormer sitting on the front roof slope */
 function dormer(cx, widthFt, g, cfg, uid) {
@@ -374,40 +380,40 @@ function stairFlight(cx, w, n, stepH, topY, g) {
   return s;
 }
 
-/* deck bridging a gap at a fixed height — used to carry the top of the
-   stair over to the wall it's climbing toward, and (for the switchback)
-   between its two flights. Filled below with a solid knee wall down to
-   grade rather than open framing, matching the rest of the stair's style. */
-function stairDeck(xLeft, xRight, y, thick, g) {
-  const width = xRight - xLeft;
-  if (width <= 0.5) return "";
-  let s = rect(xLeft, y, width, g.groundY - y, "var(--riser)");
-  s += rect(xLeft, y - 3, width, 5, "var(--trim)");
-  s += rect(xLeft, y - thick, width, thick, "var(--tread)");
-  return s;
-}
-
-/* a walkway carrying the stair over to the wall — like stairDeck, but on
-   posts rather than a solid wall, since (with the flights flipped) it may
-   run over the top of the other flight rather than open ground. */
+/* a walkway carrying the top of the stair over to the wall it's climbing
+   toward, on posts rather than a solid wall, since (with the flights
+   flipped) it may run over the top of the other flight below it. */
 function stairWalkway(xLeft, xRight, y, thick, g) {
   const width = xRight - xLeft;
   if (width <= 0.5) return "";
+  const RH = g.ft(2.6);
   let s = rect(xLeft, y - 3, width, 5, "var(--trim)");
   s += rect(xLeft, y - thick, width, thick, "var(--tread)");
   const postGap = g.ft(4);
   for (let x = xLeft + postGap / 2; x < xRight; x += postGap) {
     s += rect(x - 3, y, 6, g.groundY - y, "var(--trim)");
   }
+  // handrail running the length of the walkway, matching the flights' own
+  const balusterGap = g.ft(1.5);
+  for (let x = xLeft + balusterGap / 2; x < xRight; x += balusterGap) {
+    s += rect(x - 1.7, y - RH, 3.4, RH, "var(--trim)");
+  }
+  s += rect(xLeft, y - RH - 3, width, 5, "var(--trim)");
   return s;
+}
+
+/* a full-height structural post, ground to wall-top, regardless of how
+   tall the flight(s) next to it happen to be at that x position */
+function stairSupportPost(x, g) {
+  return rect(x - 3.5, g.wallTopY, 7, g.groundY - g.wallTopY, "var(--trim)");
 }
 
 /* exterior stair running front-to-back along the gable wall, drawn straight
    on (no perspective taper) so it stays inline with the garage side wall.
-   "switchback" splits the run into two flights side by side around a
-   landing, folding the total depth the stair needs roughly in half. Its
-   flight gap is always the code-minimum: a landing as deep as the stair
-   is wide. switchbackFlip swaps which flight sits nearer the wall. */
+   "switchback" splits the run into two flights side by side, sharing a
+   landing exactly as wide as the two flights combined, folding the total
+   depth the stair needs roughly in half. switchbackFlip swaps which
+   flight sits nearer the wall. */
 function stairs(g, cfg) {
   const rise = g.groundY - g.wallTopY;
   const n = Math.max(2, Math.round(g.ft(cfg.wallHeightFt) / g.inch(cfg.riserInches)));
@@ -418,12 +424,14 @@ function stairs(g, cfg) {
   if (cfg.stairStyle !== "switchback") {
     let s = stairFlight(g.stairCx, w, n, stepH, g.wallTopY, g);
     s += stairWalkway(g.x1, g.stairCx - w / 2, g.wallTopY, treadCap, g);
+    s += stairSupportPost(g.stairCx - w / 2, g);
+    s += stairSupportPost(g.stairCx + w / 2, g);
     return s;
   }
 
   const lowerN = Math.min(Math.max(Math.round(cfg.lowerFlightSteps), 1), n - 1);
   const upperN = n - lowerN;
-  const gap = w; // minimum: landing as deep as the stair is wide
+  const gap = g.ft(STAIR_RAIL_GAP_FT);
   const insideCx = g.stairCx - (gap / 2 + w / 2);   // nearer the wall
   const outsideCx = g.stairCx + (gap / 2 + w / 2);  // farther from the wall
   const lowerCx = cfg.switchbackFlip ? outsideCx : insideCx;
@@ -433,18 +441,17 @@ function stairs(g, cfg) {
   let s = stairFlight(lowerCx, w, lowerN, stepH, landingY, g);
   s += stairFlight(upperCx, w, upperN, stepH, g.wallTopY, g);
 
-  // landing deck bridging the two flights, plus a solid knee wall filling
-  // the gap underneath it down to grade
-  const landLeft = Math.min(lowerCx, upperCx) + w / 2;
-  const landRight = Math.max(lowerCx, upperCx) - w / 2;
-  s += stairDeck(landLeft, landRight, landingY, treadCap, g);
-  s += rect(Math.min(lowerCx, upperCx) - w / 2, landingY - 3,
-            (Math.max(lowerCx, upperCx) + w / 2) - (Math.min(lowerCx, upperCx) - w / 2), 5, "var(--trim)");
-
   // top landing carrying the stair over to the wall it climbs toward — a
   // walkway rather than a solid deck, since when the upper flight sits on
   // the outside this runs over the top of the lower flight below it
   s += stairWalkway(g.x1, upperCx - w / 2, g.wallTopY, treadCap, g);
+
+  // full-height posts at the two outer extremes of the whole structure:
+  // the wall-facing edge of the inside flight, and the outside edge of the
+  // outside flight — the same spots the flights' own corner posts already
+  // mark, just carried the full height instead of only their own flight's
+  s += stairSupportPost(insideCx - w / 2, g);
+  s += stairSupportPost(outsideCx + w / 2, g);
   return s;
 }
 

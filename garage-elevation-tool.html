@@ -380,25 +380,32 @@ function stairFlight(cx, w, n, stepH, topY, g) {
   return s;
 }
 
-/* a walkway carrying the top of the stair over to the wall it's climbing
-   toward, on posts rather than a solid wall, since (with the flights
-   flipped) it may run over the top of the other flight below it. */
-function stairWalkway(xLeft, xRight, y, thick, g) {
+/* a run of handrail on its own — balusters plus a cap rail, no deck
+   underneath — for extending a walkway's railing across ground it doesn't
+   need to floor over itself (e.g. the top of the flight it leads to). */
+function stairHandrail(xLeft, xRight, y, g) {
   const width = xRight - xLeft;
   if (width <= 0.5) return "";
   const RH = g.ft(2.6);
-  let s = rect(xLeft, y - 3, width, 5, "var(--trim)");
-  s += rect(xLeft, y - thick, width, thick, "var(--tread)");
-  const postGap = g.ft(4);
-  for (let x = xLeft + postGap / 2; x < xRight; x += postGap) {
-    s += rect(x - 3, y, 6, g.groundY - y, "var(--trim)");
-  }
-  // handrail running the length of the walkway, matching the flights' own
+  let s = "";
   const balusterGap = g.ft(1.5);
   for (let x = xLeft + balusterGap / 2; x < xRight; x += balusterGap) {
     s += rect(x - 1.7, y - RH, 3.4, RH, "var(--trim)");
   }
   s += rect(xLeft, y - RH - 3, width, 5, "var(--trim)");
+  return s;
+}
+
+/* a walkway carrying the top of the stair over to the wall it's climbing
+   toward. No support posts of its own along its length — it may run
+   directly over the top of another flight below it (when flipped), and
+   the wall-side and boundary posts drawn elsewhere already carry it. */
+function stairWalkway(xLeft, xRight, y, thick, g) {
+  const width = xRight - xLeft;
+  if (width <= 0.5) return "";
+  let s = rect(xLeft, y - 3, width, 5, "var(--trim)");
+  s += rect(xLeft, y - thick, width, thick, "var(--tread)");
+  s += stairHandrail(xLeft, xRight, y, g);
   return s;
 }
 
@@ -443,8 +450,10 @@ function stairs(g, cfg) {
 
   // top landing carrying the stair over to the wall it climbs toward — a
   // walkway rather than a solid deck, since when the upper flight sits on
-  // the outside this runs over the top of the lower flight below it
+  // the outside this runs over the top of the lower flight below it. The
+  // rail continues on past it, out to the top flight's own outside edge.
   s += stairWalkway(g.x1, upperCx - w / 2, g.wallTopY, treadCap, g);
+  s += stairHandrail(upperCx - w / 2, upperCx + w / 2, g.wallTopY, g);
 
   // full-height posts at the wall-facing edge and at the shared boundary
   // between the two flights — the same spots the flights' own corner posts

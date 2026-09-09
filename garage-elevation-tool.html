@@ -84,6 +84,11 @@ const CONFIG = {
   dormerWidths: [5, 10],  // one per dormer when dormerCount is 2; dormerWidths[0] when it's 1
   dormerWallFt:   3.5,    // face wall height below the dormer gable
 
+  dormerMatchSiding: true, // false lets the dormers use their own siding type/colors below
+  dormerSiding:   "bb",   // same options as the main siding type
+  dormerBodyColor:   "#F0ECE3",
+  dormerBattenColor: "#F5F1E9",
+
   showStairs:     true,
   stairStyle:     "straight", // "straight" | "switchback"
   stairWidthFt:   4,
@@ -195,19 +200,22 @@ const rect = (x, y, w, h, f) =>
   `<rect x="${esc(x)}" y="${esc(y)}" width="${esc(w)}" height="${esc(h)}" fill="${f}"/>`;
 const poly = (pts, f) => `<polygon points="${pts}" fill="${f}"/>`;
 
-function sidingPattern(id, kind, g) {
+function sidingPattern(id, kind, g, bodyVar, battenVar) {
+  bodyVar = bodyVar || "--body";
+  battenVar = battenVar || "--batten";
+  const body = `var(${bodyVar})`, batten = `var(${battenVar})`;
   if (kind === "bb") {
     const p = g.ft(1.35), b = g.ft(0.3);
     return `<pattern id="${id}" width="${p}" height="600" patternUnits="userSpaceOnUse">
-      <rect width="${p}" height="600" fill="var(--body)"/>
-      <rect width="${b}" height="600" fill="var(--batten)"/>
+      <rect width="${p}" height="600" fill="${body}"/>
+      <rect width="${b}" height="600" fill="${batten}"/>
       <rect x="${b}" width="1.3" height="600" fill="rgba(0,0,0,0.13)"/></pattern>`;
   }
   if (kind === "panel") {
     // wide flat sheet panels (T1-11 style) — a deep groove every 2', no batten
     const p = g.ft(2);
     return `<pattern id="${id}" width="${p}" height="600" patternUnits="userSpaceOnUse">
-      <rect width="${p}" height="600" fill="var(--body)"/>
+      <rect width="${p}" height="600" fill="${body}"/>
       <rect x="${p - 3}" width="3" height="600" fill="rgba(0,0,0,0.28)"/>
       <rect x="${p - 6}" width="1.5" height="600" fill="rgba(0,0,0,0.10)"/></pattern>`;
   }
@@ -215,9 +223,9 @@ function sidingPattern(id, kind, g) {
     // staggered cedar shake courses, alternating tone per tile
     const tw = g.ft(0.75), th = g.ft(0.6);
     return `<pattern id="${id}" width="${tw * 2}" height="${th}" patternUnits="userSpaceOnUse">
-      <rect width="${tw * 2}" height="${th}" fill="var(--body)"/>
-      <rect x="1" y="1.5" width="${tw - 2}" height="${th - 7}" fill="var(--batten)"/>
-      <rect x="${tw + 1}" y="1.5" width="${tw - 2}" height="${th - 7}" fill="var(--body)"/>
+      <rect width="${tw * 2}" height="${th}" fill="${body}"/>
+      <rect x="1" y="1.5" width="${tw - 2}" height="${th - 7}" fill="${batten}"/>
+      <rect x="${tw + 1}" y="1.5" width="${tw - 2}" height="${th - 7}" fill="${body}"/>
       <rect y="${th - 5}" width="${tw * 2}" height="5" fill="rgba(0,0,0,0.22)"/></pattern>`;
   }
   if (kind === "vinyl") {
@@ -225,12 +233,12 @@ function sidingPattern(id, kind, g) {
     // with a lighter shadow line since panels butt flush (no wood grain)
     const h = g.ft(4.5 / 12);
     return `<pattern id="${id}" width="600" height="${h}" patternUnits="userSpaceOnUse">
-      <rect width="600" height="${h}" fill="var(--body)"/>
+      <rect width="600" height="${h}" fill="${body}"/>
       <rect y="${h - 1}" width="600" height="1" fill="rgba(0,0,0,0.11)"/></pattern>`;
   }
   const h = g.ft(0.67);
   return `<pattern id="${id}" width="600" height="${h}" patternUnits="userSpaceOnUse">
-    <rect width="600" height="${h}" fill="var(--body)"/>
+    <rect width="600" height="${h}" fill="${body}"/>
     <rect y="${h - 1.3}" width="600" height="1.3" fill="rgba(0,0,0,0.15)"/></pattern>`;
 }
 
@@ -290,7 +298,7 @@ function dormer(cx, widthFt, g, cfg, uid) {
   // its peak matches the roof's own apex so no sliver of bare roof shows above it
   s += poly(
     `${cx - hw},${base} ${cx - hw},${wallT} ${cx},${peak} ${cx + hw},${wallT} ${cx + hw},${base}`,
-    `url(#sd${uid})`);
+    `url(#dsd${uid})`);
   // thin rake trim along the roof edge — a stroke, not a filled triangle,
   // so it caps the gable without hiding the siding underneath it
   s += `<polyline points="${cx - hw - 4},${wallT + 9} ${cx},${peak} ${cx + hw + 4},${wallT + 9}" fill="none" stroke="var(--trim)" stroke-width="7" stroke-linejoin="round"/>`;
@@ -330,7 +338,7 @@ function shedDormer(cx, widthFt, g, cfg, uid) {
   s += rect(cx - hw - 7, wallT, hw * 2 + 14, 1.8, "rgba(0,0,0,0.18)");
 
   // siding wall face, with corner boards instead of gable rakes
-  s += rect(cx - hw, wallT, hw * 2, base - wallT, `url(#sd${uid})`);
+  s += rect(cx - hw, wallT, hw * 2, base - wallT, `url(#dsd${uid})`);
   s += rect(cx - hw, wallT, 6, base - wallT, "var(--trim)");
   s += rect(cx + hw - 6, wallT, 6, base - wallT, "var(--trim)");
   s += rect(cx - hw, base - 4, hw * 2, 4, "var(--trim)");
@@ -496,7 +504,10 @@ function drawGarage(cfg, uid) {
   const g = geometry(cfg);
   let s = "";
 
-  s += `<defs>${sidingPattern("sd" + uid, cfg.siding, g)}${brickPattern("bk" + uid)}</defs>`;
+  const dormerSidingKind = cfg.dormerMatchSiding ? cfg.siding : cfg.dormerSiding;
+  s += `<defs>${sidingPattern("sd" + uid, cfg.siding, g)}` +
+       `${sidingPattern("dsd" + uid, dormerSidingKind, g, "--dormerBody", "--dormerBatten")}` +
+       `${brickPattern("bk" + uid)}</defs>`;
 
   // ground and sky
   s += rect(0, 0, g.W, g.groundY, "var(--sky)");
@@ -575,7 +586,10 @@ function drawGarage(cfg, uid) {
   // Site colors are pinned on the <svg> itself (not inherited from the page)
   // so a saved .svg still renders correctly on its own.
   const site = { sky: "#CBD8DF", grass: "#8C9A72", drive: "#C6C2BB" };
-  const vars = Object.entries({ ...cfg.colors, ...site })
+  const dormerColors = cfg.dormerMatchSiding
+    ? { dormerBody: cfg.colors.body, dormerBatten: cfg.colors.batten }
+    : { dormerBody: cfg.dormerBodyColor, dormerBatten: cfg.dormerBattenColor };
+  const vars = Object.entries({ ...cfg.colors, ...site, ...dormerColors })
     .map(([k, v]) => `--${k}:${v}`).join(";");
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${Math.round(g.W)} ${Math.round(g.H)}" style="${vars}">${s}</svg>`;
 }
@@ -884,6 +898,10 @@ const SHARE_SCHEMA = {
   dormerEdgeMarginFt: { code: "dem", type: "num" },
   dormerWidths:   { code: "dmw", type: "numArr" },
   dormerWallFt:   { code: "dwf", type: "num" },
+  dormerMatchSiding: { code: "dms", type: "bool" },
+  dormerSiding:   { code: "dsid", type: "str" },
+  dormerBodyColor:   { code: "dbc", type: "str" },
+  dormerBattenColor: { code: "dtc", type: "str" },
   showStairs:     { code: "ss",  type: "bool" },
   stairStyle:     { code: "sst", type: "str" },
   stairWidthFt:   { code: "sw",  type: "num" },
@@ -975,6 +993,35 @@ buildControls("ctlStairs", FIELDS_STAIRS_SWITCHBACK);
 buildToggle("ctlStairs", "switchbackFlip", "Lower flight outside");
 buildToggle("ctlStairs", "showStairs", "Stairs");
 
+function buildDormerAppearanceSection() {
+  insertFieldGroup("ctlAppearance", "Dormers");
+  buildToggle("ctlAppearance", "dormerMatchSiding", "Match main siding");
+
+  const sidingLabel = document.createElement("label");
+  sidingLabel.innerHTML = `<span>Dormer siding type</span>`;
+  const sidingSel = document.createElement("select");
+  sidingSel.innerHTML = SIDING_TYPES.map(t => `<option value="${t.id}">${t.name}</option>`).join("");
+  sidingSel.value = CONFIG.dormerSiding;
+  sidingSel.addEventListener("change", () => { CONFIG.dormerSiding = sidingSel.value; render(); });
+  sidingLabel.appendChild(sidingSel);
+  document.getElementById("ctlAppearance").appendChild(sidingLabel);
+
+  const swatchRow = document.createElement("div");
+  swatchRow.className = "swatches";
+  [["dormerBodyColor", "Dormer body"], ["dormerBattenColor", "Dormer batten"]].forEach(([key, label]) => {
+    const l = document.createElement("label");
+    l.className = "swatch";
+    l.innerHTML = `<span>${label}</span>`;
+    const inp = document.createElement("input");
+    inp.type = "color";
+    inp.value = CONFIG[key];
+    inp.addEventListener("input", () => { CONFIG[key] = inp.value; render(); });
+    l.appendChild(inp);
+    swatchRow.appendChild(l);
+  });
+  document.getElementById("ctlAppearance").appendChild(swatchRow);
+}
+
 buildAppearanceSection({
   paletteHostId: "ctlAppearance",
   swatchHostId: "ctlColors",
@@ -996,6 +1043,7 @@ buildAppearanceSection({
     host.appendChild(sidingLabel);
   }
 });
+buildDormerAppearanceSection();
 initTabs();
 render();
 </script>

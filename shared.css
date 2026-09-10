@@ -121,8 +121,11 @@ input[type=color] {
 .shead button:hover { border-color:var(--accent); color:var(--accent); }
 .art {
   background:var(--sunk); border:1px solid var(--line); border-radius:8px;
-  overflow:hidden; height:clamp(360px, 60vh, 780px);
+  overflow:hidden; height:520px;
   display:flex; align-items:flex-end; justify-content:center;
+}
+@media (max-height:780px) {
+  .art { height:360px; }
 }
 /* No width/height override here on purpose: with only a viewBox set, an
    inline SVG's intrinsic size *is* its viewBox in CSS px (1 drawing unit

@@ -127,13 +127,12 @@ input[type=color] {
 @media (max-height:780px) {
   .art { height:360px; }
 }
-/* No width/height override here on purpose: with only a viewBox set, an
-   inline SVG's intrinsic size *is* its viewBox in CSS px (1 drawing unit
-   = 1px), so it never rescales as content grows. Combined with the fixed-
-   height, bottom-anchored, overflow-hidden container above, growing the
-   building's height just extends the drawing upward — any overflow gets
-   cropped at the top instead of the whole image rescaling/repositioning. */
-.art svg { display:block; }
+/* With only a viewBox set, an inline SVG's intrinsic size is its viewBox
+   in CSS px (1 drawing unit = 1px). max-height/max-width here cap that
+   intrinsic size down to fit the bottom-anchored container when the
+   drawing grows taller than the available space, without ever scaling
+   it up past its natural size when there's room to spare. */
+.art svg { display:block; height:auto; width:auto; max-height:100%; max-width:100%; }
 
 /* ---- flyouts / context menu / toast / modal ---- */
 .flyout { position:relative; }
